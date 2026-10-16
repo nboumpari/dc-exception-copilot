@@ -10,12 +10,14 @@ Besides random day-to-day activity, a handful of DEMO SCENARIOS are planted arou
 SIM_TODAY so the copilot has realistic open problems to work on (see plant_scenarios).
 """
 
+import json
 import random
 import sqlite3
 from datetime import date, datetime, timedelta
 from itertools import combinations
+from pathlib import Path
 
-from copilot.config import DATA_DIR, SYNTHETIC_DIR
+from copilot.config import DC_DB_PATH, SCENARIOS_PATH, SYNTHETIC_DIR
 from copilot.synthetic.catalog import (
     CARRIERS,
     CUSTOMERS,
@@ -23,6 +25,7 @@ from copilot.synthetic.catalog import (
     FAMILIES,
     FUTURE_DAYS,
     HISTORY_DAYS,
+    SIM_NOW,
     SIM_TODAY,
     SUPPLIERS,
     ZONES,
@@ -30,10 +33,9 @@ from copilot.synthetic.catalog import (
 from copilot.synthetic.incidents import TYPES, render_incident
 from copilot.synthetic.sds import SDS_DIR, write_sds
 
-DB_PATH = DATA_DIR / "dc.db"
 INCIDENT_DIR = SYNTHETIC_DIR / "incidents"
 GS1_COMPANY_PREFIX = "0614141"  # GS1's documented example prefix, never a real company
-NOW = datetime.fromisoformat(f"{SIM_TODAY} 18:00")
+NOW = datetime.fromisoformat(SIM_NOW)
 
 # 49 CFR 177.848(d) pairs relevant to this catalog that need separation ("O").
 # Only applies to packages requiring labels/placards, i.e. NOT limited quantities.
@@ -538,9 +540,9 @@ class Generator:
         return scenarios
 
 
-def write_db(gen: Generator) -> None:
-    DB_PATH.unlink(missing_ok=True)
-    con = sqlite3.connect(DB_PATH)
+def write_db(gen: Generator, path: Path = DC_DB_PATH) -> None:
+    path.unlink(missing_ok=True)
+    con = sqlite3.connect(path)
     con.executescript(SCHEMA)
     for table, rows in gen.rows.items():
         marks = ",".join("?" * len(rows[0]))
@@ -567,8 +569,10 @@ def main() -> None:
     gen = Generator(seed=42)
     scenarios = gen.run()
     write_db(gen)
+    SCENARIOS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCENARIOS_PATH.write_text(json.dumps(scenarios, indent=2), encoding="utf-8")
     n_inc = write_incidents(gen)
-    print(f"Wrote {DB_PATH}")
+    print(f"Wrote {DC_DB_PATH} (scenario answer key: {SCENARIOS_PATH})")
     for table, rows in gen.rows.items():
         print(f"  {table:18} {len(rows):6,} rows")
     print(f"Wrote {n_inc} incident reports to {INCIDENT_DIR}")

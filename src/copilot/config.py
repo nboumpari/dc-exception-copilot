@@ -10,6 +10,11 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 SYNTHETIC_DIR = DATA_DIR / "synthetic"
+DC_DB_PATH = DATA_DIR / "dc.db"  # synthetic warehouse database (step 3)
+REFERENCE_DB_PATH = DATA_DIR / "reference.db"  # tables parsed from regulations (step 5)
+# answer key for planted demo scenarios - deliberately NOT inside dc.db, so the agent
+# cannot read the answers through its SQL tool
+SCENARIOS_PATH = DATA_DIR / "eval" / "scenarios.json"
 
 
 class Settings(BaseSettings):

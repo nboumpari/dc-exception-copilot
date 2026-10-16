@@ -18,6 +18,7 @@ DC = {
 
 # Simulation clock: history runs up to SIM_TODAY, planned work runs a few days past it.
 SIM_TODAY = "2026-10-16"
+SIM_NOW = f"{SIM_TODAY} 18:00"  # the moment the copilot is "used" in demos and evaluation
 HISTORY_DAYS = 90
 FUTURE_DAYS = 3
 

@@ -97,7 +97,20 @@ Hybrid search over the chunks: **BM25** keyword search (exact codes like `UN1950
 re-indexing only pays for changed chunks (full corpus is about $0.01).
 
 Evaluated on a 42-question golden set ([data/eval/retrieval_golden.yaml](data/eval/retrieval_golden.yaml))
-against a naive LangChain `RecursiveCharacterTextSplitter` baseline. Latest results:
+against a naive LangChain `RecursiveCharacterTextSplitter` baseline:
+
+| Chunking | Search | Hit@1 | Hit@5 | MRR@10 |
+|---|---|---|---|---|
+| Structured | BM25 | 38% | 69% | 0.52 |
+| Structured | Vector | **64%** | **88%** | **0.73** |
+| Structured | Hybrid | 62% | 81% | 0.70 |
+| Naive | Vector | 60% | 81% | 0.67 |
+| Naive | Hybrid | 60% | 86% | 0.70 |
+
+Structure-aware chunks with vector search rank the answer first most often, and also give
+exact citations (`29 CFR 1910.178(l)`) that the naive chunks cannot. Remaining misses are
+mostly DC procedures crowded out by the large GS1 corpus - addressed in the agent by
+routing questions to the right collection with metadata filters. Full report:
 [data/eval/results/retrieval.md](data/eval/results/retrieval.md).
 
 ## Walkthrough notebook

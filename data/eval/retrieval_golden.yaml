@@ -9,6 +9,10 @@
 # strategies can be compared on the same questions.
 #
 # `category`: regulation | standard | sop | sds | incident  (for per-category results)
+#
+# Label review: evidence lists were only ever widened where a manual review of retrieved
+# chunks showed a genuinely correct answer phrased differently (marked "label review").
+# Retrieval settings are never tuned against this set - that would overfit the test.
 
 - id: R01
   category: regulation
@@ -49,7 +53,8 @@
 - id: R10
   category: regulation
   question: In the hazmat compatibility chart, what does an O mean?
-  evidence: ["unless separated in a manner that"]
+  # label review: the SOP paraphrase of the rule is an equally valid answer
+  evidence: ["unless separated in a manner that", "may not be loaded together **unless separated**"]
 - id: R11
   category: regulation
   question: Can corrosive liquids be loaded right next to oxidizers on a trailer?
@@ -81,7 +86,8 @@
 - id: S02
   category: standard
   question: What is the one thing every pallet label must always contain?
-  evidence: ["the only mandatory requirement is that each logistic unit must be identified with a unique serial number"]
+  # label review: the label-content section stating the SSCC is mandatory also answers it
+  evidence: ["the only mandatory requirement is that each logistic unit must be identified with a unique serial number", "mandatory data sscc with ai (00)"]
 - id: S03
   category: standard
   question: The pallet already has a label but the carrier needs more info on it. Where does the extra info go?

@@ -45,6 +45,7 @@ Sources are listed in [`config/corpus_sources.yaml`](config/corpus_sources.yaml)
 uv sync                                   # install
 cp .env.example .env                      # add your API key
 uv run python -m copilot.ingest.download  # fetch corpus (~18 MB) into data/raw/
+uv run python -m copilot.ingest.build_chunks  # parse + chunk -> data/processed/chunks.jsonl
 uv run pytest                             # run tests
 ```
 

@@ -5,7 +5,7 @@ Each step ends with something that runs and is tested, and is one git commit (or
 | # | Step | Output | Status |
 |---|------|--------|--------|
 | 1 | **Setup + corpus download** | Project skeleton, `download.py`, manifest of 15 sources | done |
-| 2 | **Parse + chunk** | eCFR XML → section/paragraph chunks with citations; GS1 PDFs → heading chunks; all to `chunks.jsonl` | |
+| 2 | **Parse + chunk** | eCFR XML → section/paragraph chunks with citations; GS1 PDFs → heading chunks; all to `chunks.jsonl` (1,636 chunks, 539k tokens) | done |
 | 3 | **Synthetic DC data** | ~15 SOPs + ~150 incident reports (markdown); SQLite WMS: SKUs, inventory, shipments, exceptions | |
 | 4 | **Retrieval baseline** | Embeddings + ChromaDB + BM25 hybrid; small golden set; recall@5 measured | |
 | 5 | **Tools** | Read-only SQL tool, Hazmat Table lookup, 177.848 segregation checker (unit-tested) | |

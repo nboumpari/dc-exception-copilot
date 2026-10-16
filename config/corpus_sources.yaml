@@ -28,10 +28,12 @@ ecfr:
 pdf:
   # --- GS1 logistics standards (free download, do not redistribute) ---
   - id: gs1_logistic_label
+    title: GS1 Logistic Label Guideline
     url: https://www.gs1.org/docs/tl/GS1_Logistic_Label_Guideline.pdf
     use: rag
     topic: "GS1 logistic (pallet) label - SSCC, layout, barcodes"
   - id: gs1_general_specs
+    title: GS1 General Specifications
     url: https://www.gs1.org/docs/barcodes/GS1_General_Specifications.pdf
     use: rag
     topic: "GS1 General Specifications - identification keys and barcodes"

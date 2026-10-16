@@ -6,6 +6,7 @@ re-indexing after a code change only pays for chunks whose text actually changed
 
 import hashlib
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Protocol
 
@@ -27,9 +28,13 @@ class Embedder(Protocol):
 
 
 class EmbeddingCache:
+    """Thread-safe: one connection shared across threads, every access under a lock
+    (evaluation runs questions concurrently)."""
+
     def __init__(self, path: Path = CACHE_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.con = sqlite3.connect(path)
+        self.con = sqlite3.connect(path, check_same_thread=False)
+        self.lock = threading.Lock()
         self.con.execute(
             "CREATE TABLE IF NOT EXISTS emb (model TEXT, key TEXT, vec BLOB, PRIMARY KEY (model, key))"
         )
@@ -43,19 +48,19 @@ class EmbeddingCache:
         found = {}
         for i in range(0, len(keys), 500):
             part = keys[i : i + 500]
-            rows = self.con.execute(
-                f"SELECT key, vec FROM emb WHERE model = ? AND key IN ({','.join('?' * len(part))})",
-                [model, *part],
-            )
+            with self.lock:
+                rows = self.con.execute(
+                    f"SELECT key, vec FROM emb WHERE model = ? AND key IN ({','.join('?' * len(part))})",
+                    [model, *part],
+                ).fetchall()
             found.update({k: np.frombuffer(v, dtype=np.float32) for k, v in rows})
         return found
 
     def put_many(self, model: str, texts: list[str], vecs: np.ndarray) -> None:
-        self.con.executemany(
-            "INSERT OR REPLACE INTO emb VALUES (?, ?, ?)",
-            [(model, self.key(t), v.astype(np.float32).tobytes()) for t, v in zip(texts, vecs)],
-        )
-        self.con.commit()
+        rows = [(model, self.key(t), v.astype(np.float32).tobytes()) for t, v in zip(texts, vecs)]
+        with self.lock:
+            self.con.executemany("INSERT OR REPLACE INTO emb VALUES (?, ?, ?)", rows)
+            self.con.commit()
 
 
 class CachedEmbedder:

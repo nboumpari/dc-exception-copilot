@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | structured | bm25 | 38% | 69% | 0.520 |
 | structured | vector | 64% | 88% | 0.731 |
-| structured | hybrid | 62% | 81% | 0.697 |
+| structured | hybrid | 62% | 81% | 0.701 |
 | naive | bm25 | 43% | 69% | 0.562 |
 | naive | vector | 60% | 81% | 0.671 |
 | naive | hybrid | 60% | 86% | 0.700 |

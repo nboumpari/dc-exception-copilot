@@ -59,7 +59,7 @@ def sync_dataset(client: Client) -> str:
 
 # ---------- evaluators: (outputs, reference_outputs) -> score ----------
 def _first_relevant_rank(outputs: dict, reference_outputs: dict) -> int | None:
-    for rank, doc in enumerate(outputs["documents"], 1):
+    for rank, doc in enumerate((outputs or {}).get("documents", []), 1):  # failed run -> miss
         if is_relevant({"text": doc["text"]}, reference_outputs["evidence"]):
             return rank
     return None

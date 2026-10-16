@@ -75,6 +75,16 @@ def test_embedding_cache_only_calls_api_for_new_texts(tmp_path):
     assert calls == [["a", "b"], ["c"]]
 
 
+def test_embedding_cache_is_safe_across_threads(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    emb = CachedEmbedder("t", lambda batch: np.ones((len(batch), 4)),
+                         EmbeddingCache(tmp_path / "c.sqlite"))
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda i: emb.embed([f"text {i}", "shared"]), range(20)))
+    assert all(r.shape == (2, 4) for r in results)
+
+
 def test_relevance_matching_is_robust_to_formatting():
     c = {"text": "the unique identi-\nfication  Number"}
     assert normalize("identification number") in normalize(c["text"])

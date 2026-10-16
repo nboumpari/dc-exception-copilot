@@ -23,6 +23,11 @@ from copilot.retrieval.embeddings import Embedder
 CHROMA_DIR = DATA_DIR / "index" / "chroma"
 RRF_K = 60  # standard constant from Cormack et al. (2009)
 CANDIDATES = 50  # how many results each retriever contributes to the fusion
+# HNSW is approximate: with the default ef_search (100) rankings past ~rank 15 varied
+# between processes. With a corpus of a few thousand chunks, an ef_search above the
+# corpus size makes the search effectively exhaustive - exact and reproducible.
+HNSW_EF_SEARCH = 4096
+INDEX_VERSION = "2"  # bump when index settings change, to force a rebuild
 
 _TOKEN = re.compile(r"[a-z0-9]+(?:[.\-][a-z0-9]+)*")
 _STOPWORDS = frozenset(
@@ -112,13 +117,18 @@ class Retriever:
         )
         slug = re.sub(r"[^a-zA-Z0-9._-]", "-", f"{name}-{self.embedder.name}")
         digest = corpus_hash(self.chunks)
+        wanted = {"corpus_hash": digest, "index_version": INDEX_VERSION}
         if slug in {c.name for c in client.list_collections()}:
             col = client.get_collection(slug)
-            if (col.metadata or {}).get("corpus_hash") == digest and col.count() == len(self.chunks):
+            meta = col.metadata or {}
+            if all(meta.get(k) == v for k, v in wanted.items()) and col.count() == len(self.chunks):
                 return col  # index is up to date
-            client.delete_collection(slug)  # corpus changed: rebuild
+            client.delete_collection(slug)  # corpus or settings changed: rebuild (vectors cached)
         col = client.create_collection(
-            slug, embedding_function=None, metadata={"hnsw:space": "cosine", "corpus_hash": digest}
+            slug,
+            embedding_function=None,
+            configuration={"hnsw": {"space": "cosine", "ef_search": HNSW_EF_SEARCH}},
+            metadata=wanted,
         )
         vecs = self.embedder.embed([c["text"] for c in self.chunks])
         for i in range(0, len(self.chunks), 1000):
@@ -167,7 +177,7 @@ class Retriever:
         run_type="retriever",
         name="retrieve",
         process_inputs=lambda i: {k: v for k, v in i.items() if k != "self"},
-        process_outputs=lambda hits: {"documents": [_as_document(h) for h in hits]},
+        process_outputs=lambda hits: {"documents": [_as_document(h) for h in hits or []]},
     )
     def search(self, query: str, k: int = 5, mode: str = "hybrid", where: dict | None = None) -> list[Hit]:
         """mode: 'bm25' | 'vector' | 'hybrid'. `where` filters on metadata, e.g.

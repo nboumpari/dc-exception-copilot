@@ -39,6 +39,7 @@ def test_evaluators_score_rank_of_first_relevant_document():
     assert hit_at_5(out, ref)["score"] == 1
     assert reciprocal_rank(out, ref)["score"] == 0.5
     assert reciprocal_rank({"documents": []}, ref)["score"] == 0.0
+    assert hit_at_5({}, ref)["score"] == 0  # a failed run counts as a miss, not a crash
 
 
 def test_dataset_name_is_versioned_by_golden_file_content():

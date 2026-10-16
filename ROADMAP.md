@@ -10,7 +10,7 @@ Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 | 3 | **Synthetic DC data** | 15 SOPs, 16 SDS, 205 incident reports; SQLite WMS (1.2k shipments, 367 exceptions, 6 planted scenarios); corpus now 1,896 chunks | done |
 | 4 | **Retrieval baseline** | BM25 + ChromaDB vectors + RRF hybrid; 42-question golden set; structured vs naive chunking compared | done |
 | 4b | **Observability** | LangSmith tracing of retrieval and embeddings; golden set as LangSmith dataset + experiments | done |
-| 5 | **Tools** | Read-only SQL tool, Hazmat Table lookup, 177.848 segregation checker (unit-tested) | |
+| 5 | **Tools** | Read-only SQL, Hazardous Materials Table lookup, 177.848 segregation + shipment compliance, departure risk, document search; tested on the planted scenarios | done |
 | 6 | **Agents (LangGraph)** | Supervisor + knowledge + ops agents; cited answers; human-approval step for actions | |
 | 7 | **API + UI** | FastAPI `/ask` endpoint; Streamlit chat with sources panel and trace view | |
 | 8 | **Evaluation** | ~60-question golden set; groundedness, citation accuracy, SQL accuracy, refusal tests | |

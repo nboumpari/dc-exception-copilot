@@ -71,6 +71,7 @@ uv sync                                   # install
 cp .env.example .env                      # add your API key
 uv run python -m copilot.ingest.download  # fetch corpus (~18 MB) into data/raw/
 uv run python -m copilot.synthetic.build_wms  # synthetic DC: data/dc.db, incidents, SDS
+uv run python -m copilot.tools.hazmat         # hazmat reference table -> data/reference.db
 uv run python -m copilot.ingest.build_chunks  # parse + chunk -> data/processed/chunks.jsonl
 uv run python -m copilot.retrieval.naive_chunks   # baseline chunks for comparison
 uv run python -m copilot.eval.retrieval_eval      # retrieval metrics -> data/eval/results/
@@ -112,6 +113,21 @@ exact citations (`29 CFR 1910.178(l)`) that the naive chunks cannot. Remaining m
 mostly DC procedures crowded out by the large GS1 corpus - addressed in the agent by
 routing questions to the right collection with metadata filters. Full report:
 [data/eval/results/retrieval.md](data/eval/results/retrieval.md).
+
+## Agent tools
+
+Plain Python functions the agent calls. Safety- and compliance-critical decisions are made by
+deterministic, tested code - the LLM chooses a tool and explains the result.
+
+| Tool | What it does |
+|---|---|
+| `sql_query`, `describe_schema` | Read-only SQL over the warehouse DB: read-only connection + an SQLite authorizer that rejects every non-read operation, one statement per call, row and time limits |
+| `lookup_hazmat` | 49 CFR 172.101 Hazardous Materials Table (3,000+ entries) parsed from the regulation into `data/reference.db` |
+| `check_shipment_compliance` | 177.848 segregation using the table parsed from the regulation, the limited-quantity exception, the DC's calcium hypochlorite / TCCA rule, and carrier hazmat endorsement |
+| `assess_departure_risk` | The at-risk rules of SOP-OUT-002 §3 (trailer assignment, carrier on-time rate, endorsement) |
+| `search_documents` | Retrieval with collection filters; vector search by default, hybrid when the query contains an identifier |
+
+Every tool is traced in LangSmith and returns findings with citations.
 
 ## Observability (LangSmith)
 

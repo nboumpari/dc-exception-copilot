@@ -1,0 +1,37 @@
+# Every document the copilot can retrieve from. All are free to download.
+# Files land in data/raw/<id>/ and are NOT committed (see .gitignore).
+#
+# kind:
+#   ecfr - US Code of Federal Regulations via the eCFR API (public domain, XML)
+#   pdf  - direct PDF download
+# use:
+#   rag        - chunked + embedded for retrieval
+#   structured - parsed into a table and queried by a deterministic tool
+
+ecfr:
+  # --- OSHA warehouse safety (29 CFR 1910) ---
+  - {id: osha_1910_22,   title: 29, section: "1910.22",   use: rag, topic: "Walking-working surfaces"}
+  - {id: osha_1910_37,   title: 29, section: "1910.37",   use: rag, topic: "Exit routes"}
+  - {id: osha_1910_106,  title: 29, section: "1910.106",  use: rag, topic: "Flammable liquids storage"}
+  - {id: osha_1910_157,  title: 29, section: "1910.157",  use: rag, topic: "Portable fire extinguishers"}
+  - {id: osha_1910_176,  title: 29, section: "1910.176",  use: rag, topic: "Materials handling and storage"}
+  - {id: osha_1910_178,  title: 29, section: "1910.178",  use: rag, topic: "Powered industrial trucks (forklifts)"}
+  - {id: osha_1910_1200, title: 29, section: "1910.1200", use: rag, topic: "Hazard communication / Safety Data Sheets"}
+  # --- Hazardous materials transport (49 CFR) ---
+  - {id: hmr_172_315, title: 49, section: "172.315", use: rag, topic: "Limited quantity marking"}
+  - {id: hmr_173_150, title: 49, section: "173.150", use: rag, topic: "Limited quantities - flammable liquids"}
+  - {id: hmr_173_306, title: 49, section: "173.306", use: rag, topic: "Aerosols and compressed gases - limited quantities"}
+  - {id: hmr_177_834, title: 49, section: "177.834", use: rag, topic: "Loading and unloading - general"}
+  - {id: hmr_177_848, title: 49, section: "177.848", use: rag, topic: "Segregation of hazardous materials (highway)"}
+  - {id: hmr_172_101, title: 49, section: "172.101", use: structured, topic: "Hazardous Materials Table"}
+
+pdf:
+  # --- GS1 logistics standards (free download, do not redistribute) ---
+  - id: gs1_logistic_label
+    url: https://www.gs1.org/docs/tl/GS1_Logistic_Label_Guideline.pdf
+    use: rag
+    topic: "GS1 logistic (pallet) label - SSCC, layout, barcodes"
+  - id: gs1_general_specs
+    url: https://www.gs1.org/docs/barcodes/GS1_General_Specifications.pdf
+    use: rag
+    topic: "GS1 General Specifications - identification keys and barcodes"

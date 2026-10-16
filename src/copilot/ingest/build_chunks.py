@@ -3,8 +3,8 @@
 Usage:
     uv run python -m copilot.ingest.build_chunks
 
-Reads data/raw/manifest.json (written by download.py), parses every source marked
-`use: rag`, and writes one JSON object per chunk plus a stats summary.
+Reads data/raw/manifest.json (written by download.py) and the local synthetic docs,
+parses every source marked `use: rag`, and writes one JSON object per chunk plus stats.
 """
 
 import json
@@ -14,9 +14,10 @@ from dataclasses import asdict
 
 import yaml
 
-from copilot.config import CONFIG_DIR, PROCESSED_DIR, RAW_DIR
+from copilot.config import CONFIG_DIR, PROCESSED_DIR, PROJECT_ROOT, RAW_DIR
 from copilot.ingest.chunking import Chunk
 from copilot.ingest.parse_ecfr import parse_ecfr
+from copilot.ingest.parse_markdown import parse_markdown
 from copilot.ingest.parse_pdf import parse_pdf
 
 
@@ -44,6 +45,18 @@ def build() -> list[Chunk]:
         for c in parsed:
             c.extra = {"topic": entry["topic"], "source_sha256": entry["sha256"]}
         print(f"  {entry['id']:20} {len(parsed):5} chunks")
+        chunks += parsed
+
+    for src in cfg.get("local", []):
+        files = sorted(PROJECT_ROOT.glob(src["glob"]))
+        if not files:
+            raise SystemExit(f"{src['id']}: no files match {src['glob']} - run step 3 generators first")
+        parsed = []
+        for f in files:
+            for c in parse_markdown(f, f.relative_to(PROJECT_ROOT).as_posix()):
+                c.extra.update({"topic": src["topic"], "collection": src["id"]})
+                parsed.append(c)
+        print(f"  {src['id']:20} {len(parsed):5} chunks ({len(files)} files)")
         chunks += parsed
     return chunks
 

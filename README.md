@@ -34,10 +34,35 @@ User (Streamlit UI / FastAPI)
 | 49 CFR 172–177 (HMR) via eCFR | Limited quantities, aerosols, loading, segregation | RAG |
 | 49 CFR 172.101 | Hazardous Materials Table | Structured lookup |
 | GS1 Logistic Label Guideline, General Specs | Pallet labels, SSCC, barcodes | RAG |
-| Synthetic SOPs + incident reports | The fictional DC's own procedures & history | RAG |
-| Synthetic WMS data | SKUs, inventory, shipments, exceptions | SQL |
+| Synthetic SOPs (15) | The fictional DC's procedures, citing the real regulations | RAG |
+| Synthetic Safety Data Sheets (16) | 16-section GHS format; transport data from 49 CFR 172.101 | RAG |
+| Synthetic incident reports (~200) | Past exceptions: root cause, actions, SOP references | RAG |
+| Synthetic warehouse database (SQLite) | SKUs, locations, inventory, receipts, shipments, exceptions | SQL |
 
 Sources are listed in [`config/corpus_sources.yaml`](config/corpus_sources.yaml).
+
+> **Why US regulations?** OSHA and DOT rules are public domain and downloadable by script via
+> the eCFR API. The European equivalent (UNECE ADR) blocks automated downloads, so it is left as
+> an optional manual add-on.
+
+## The fictional DC
+
+**Meridian Consumer Goods - Columbus DC (`DC-COL1`)** - invented company, people and partners.
+43 SKUs from laundry pods to 20 L hydrogen peroxide drums, 8 storage zones (incl. aerosol cage,
+flammables room, oxidizer and corrosive bays), 90 days of history up to the simulated
+"today" **2026-10-16**, plus 3 days of planned work. The hazmat classifications are real
+(checked against the Hazardous Materials Table by a unit test).
+
+Planted scenarios the copilot should find (ids are deterministic):
+
+| Scenario | Where | What a good answer notices |
+|---|---|---|
+| Oxidizer + corrosive drums on one trailer tomorrow | `SHP-01209` | 177.848 "O" pair (5.1 + 8); split per SOP-HAZ-002 |
+| Same chemistries, consumer packs only | `SHP-01210` | Limited quantities: segregation table does not apply |
+| Bulk pool shock + TCCA, non-hazmat carrier | `SHP-01211` | Carrier not endorsed **and** SDS says never mix the two |
+| 05:30 departure, no trailer, unreliable carrier | `SHP-01212` | At risk per SOP-OUT-002; backup carrier, notify customer |
+| Inbound from co-packer with label history | `RCV-00408` | Supplier on enhanced inspection list (SOP-REC-002) |
+| Bleach leak near the oxidizer bay | `EXC-00367` | High severity; spill response SOP-HAZ-004 |
 
 ## Quickstart
 
@@ -45,6 +70,7 @@ Sources are listed in [`config/corpus_sources.yaml`](config/corpus_sources.yaml)
 uv sync                                   # install
 cp .env.example .env                      # add your API key
 uv run python -m copilot.ingest.download  # fetch corpus (~18 MB) into data/raw/
+uv run python -m copilot.synthetic.build_wms  # synthetic DC: data/dc.db, incidents, SDS
 uv run python -m copilot.ingest.build_chunks  # parse + chunk -> data/processed/chunks.jsonl
 uv run pytest                             # run tests
 ```
@@ -54,7 +80,8 @@ uv run pytest                             # run tests
 ```
 config/            corpus sources and settings
 data/raw/          downloaded corpus (git-ignored)
-data/synthetic/    generated SOPs, incidents, WMS data
+data/synthetic/    SOPs (hand-written), SDS + incident reports (generated)
+data/dc.db         synthetic warehouse database (git-ignored, regenerate)
 src/copilot/       package: ingest/, retrieval/, agents/, tools/, api/
 tests/             unit tests + eval suite
 ```

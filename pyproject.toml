@@ -33,3 +33,6 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/copilot/synthetic/sds.py" = ["C408"]  # dict(...) reads better for SDS profiles

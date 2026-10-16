@@ -2,6 +2,7 @@
 # Files land in data/raw/<id>/ and are NOT committed (see .gitignore).
 #
 # kind:
+#   local - the fictional DC's own markdown docs, generated / written in step 3
 #   ecfr - US Code of Federal Regulations via the eCFR API (public domain, XML)
 #   pdf  - direct PDF download
 # use:
@@ -37,3 +38,18 @@ pdf:
     url: https://www.gs1.org/docs/barcodes/GS1_General_Specifications.pdf
     use: rag
     topic: "GS1 General Specifications - identification keys and barcodes"
+
+local:
+  # --- The fictional DC's own documents (synthetic, committed to git) ---
+  - id: dc_sops
+    glob: data/synthetic/sops/*.md
+    use: rag
+    topic: "DC standard operating procedures"
+  - id: dc_sds
+    glob: data/synthetic/sds/*.md
+    use: rag
+    topic: "Safety Data Sheets for the DC's products"
+  - id: dc_incidents
+    glob: data/synthetic/incidents/*.md
+    use: rag
+    topic: "Past exception incident reports"

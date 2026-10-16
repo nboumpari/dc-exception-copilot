@@ -86,6 +86,7 @@ data/synthetic/    SOPs (hand-written), SDS + incident reports (generated)
 data/dc.db         synthetic warehouse database (git-ignored, regenerate)
 src/copilot/       package: ingest/, retrieval/, agents/, tools/, api/
 tests/             unit tests + eval suite
+notebooks/         walkthrough notebook (imports the modules)
 ```
 
 ## Retrieval
@@ -98,5 +99,16 @@ re-indexing only pays for changed chunks (full corpus is about $0.01).
 Evaluated on a 42-question golden set ([data/eval/retrieval_golden.yaml](data/eval/retrieval_golden.yaml))
 against a naive LangChain `RecursiveCharacterTextSplitter` baseline. Latest results:
 [data/eval/results/retrieval.md](data/eval/results/retrieval.md).
+
+## Walkthrough notebook
+
+[notebooks/demo.ipynb](notebooks/demo.ipynb) tours each build step with tables and charts
+(saved with outputs, so it renders on GitHub). It only imports the project's modules - all
+logic lives in tested code under `src/copilot/`.
+
+```bash
+uv sync --group notebook
+uv run jupyter lab notebooks/demo.ipynb
+```
 
 See [ROADMAP.md](ROADMAP.md) for build steps.

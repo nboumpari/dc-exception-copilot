@@ -1,6 +1,7 @@
 # Roadmap
 
 Each step ends with something that runs and is tested, and is one git commit (or a few).
+Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 
 | # | Step | Output | Status |
 |---|------|--------|--------|

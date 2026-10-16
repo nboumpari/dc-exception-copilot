@@ -26,5 +26,11 @@ class Settings(BaseSettings):
 
     corpus_contact: str = "anonymous"
 
+    # LangSmith tracing and evaluation (off unless enabled and a key is set)
+    langsmith_tracing: bool = False
+    langsmith_api_key: str = ""
+    langsmith_project: str = "dc-exception-copilot"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+
 
 settings = Settings()

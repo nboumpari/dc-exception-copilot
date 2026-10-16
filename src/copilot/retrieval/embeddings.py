@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Protocol
 
 import numpy as np
+from langsmith.run_helpers import get_current_run_tree
 
 from copilot.config import DATA_DIR, settings
+from copilot.observability import traceable
 
 CACHE_PATH = DATA_DIR / "index" / "embedding_cache.sqlite"
 OPENAI_MODEL = "text-embedding-3-small"  # 1536 dims, $0.02 / 1M tokens
@@ -96,8 +98,18 @@ def openai_embedder() -> CachedEmbedder:
         client = OpenAI(api_key=settings.openai_api_key)
         model = OPENAI_MODEL
 
+    @traceable(
+        run_type="embedding",
+        name="openai_embeddings",
+        # log a summary, not 1,536 floats per text
+        process_inputs=lambda i: {"model": model, "texts": len(i["batch"]), "first": i["batch"][0][:200]},
+        process_outputs=lambda vecs: {"vectors": len(vecs), "dims": len(vecs[0]) if vecs else 0},
+    )
     def raw(batch: list[str]) -> list[list[float]]:
         resp = client.embeddings.create(model=model, input=batch)
+        run = get_current_run_tree()
+        if run is not None:
+            run.add_metadata({"model": model, "total_tokens": resp.usage.total_tokens})
         return [d.embedding for d in resp.data]
 
     return CachedEmbedder(f"{settings.llm_provider}:{model}", raw)

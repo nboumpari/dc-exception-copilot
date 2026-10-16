@@ -9,6 +9,7 @@ Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 | 2 | **Parse + chunk** | eCFR XML → section/paragraph chunks with citations; GS1 PDFs → heading chunks; all to `chunks.jsonl` (1,636 chunks, 539k tokens) | done |
 | 3 | **Synthetic DC data** | 15 SOPs, 16 SDS, 205 incident reports; SQLite WMS (1.2k shipments, 367 exceptions, 6 planted scenarios); corpus now 1,896 chunks | done |
 | 4 | **Retrieval baseline** | BM25 + ChromaDB vectors + RRF hybrid; 42-question golden set; structured vs naive chunking compared | done |
+| 4b | **Observability** | LangSmith tracing of retrieval and embeddings; golden set as LangSmith dataset + experiments | done |
 | 5 | **Tools** | Read-only SQL tool, Hazmat Table lookup, 177.848 segregation checker (unit-tested) | |
 | 6 | **Agents (LangGraph)** | Supervisor + knowledge + ops agents; cited answers; human-approval step for actions | |
 | 7 | **API + UI** | FastAPI `/ask` endpoint; Streamlit chat with sources panel and trace view | |

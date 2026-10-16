@@ -113,6 +113,27 @@ mostly DC procedures crowded out by the large GS1 corpus - addressed in the agen
 routing questions to the right collection with metadata filters. Full report:
 [data/eval/results/retrieval.md](data/eval/results/retrieval.md).
 
+## Observability (LangSmith)
+
+Every search is traced to [LangSmith](https://smith.langchain.com) as a retriever run, with
+its documents, citations, BM25/vector ranks and the nested embedding call (token usage
+recorded). The agent added in later steps is traced the same way.
+
+```bash
+# in .env
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_...
+```
+
+The golden set can also be run as LangSmith **experiments** (one per chunking strategy and
+search mode, scored by hit@1, hit@5 and reciprocal rank) to compare configurations in the UI:
+
+```bash
+uv run python -m copilot.eval.langsmith_eval --strategies structured --modes vector,hybrid
+```
+
+Tracing is off by default and always off in tests.
+
 ## Walkthrough notebook
 
 [notebooks/demo.ipynb](notebooks/demo.ipynb) tours each build step with tables and charts

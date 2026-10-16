@@ -17,6 +17,7 @@ import chromadb
 import numpy as np
 
 from copilot.config import DATA_DIR, PROCESSED_DIR
+from copilot.observability import traceable
 from copilot.retrieval.embeddings import Embedder
 
 CHROMA_DIR = DATA_DIR / "index" / "chroma"
@@ -63,6 +64,23 @@ class Hit:
     score: float
     bm25_rank: int | None = None
     vector_rank: int | None = None
+
+
+def _as_document(hit: Hit) -> dict:
+    """LangSmith renders retriever outputs in this LangChain-Document shape."""
+    c = hit.chunk
+    return {
+        "type": "Document",
+        "page_content": c["body"],
+        "metadata": {
+            "citation": c["citation"],
+            "chunk_id": c["chunk_id"],
+            "score": round(hit.score, 5),
+            "bm25_rank": hit.bm25_rank,
+            "vector_rank": hit.vector_rank,
+            "url": c.get("url", ""),
+        },
+    }
 
 
 def _rrf(rankings: list[list[int]]) -> dict[int, float]:
@@ -145,6 +163,12 @@ class Retriever:
         res = self.collection.query(query_embeddings=[qvec], n_results=n, where=chroma_where)
         return [self.index_of[i] for i in res["ids"][0]]
 
+    @traceable(
+        run_type="retriever",
+        name="retrieve",
+        process_inputs=lambda i: {k: v for k, v in i.items() if k != "self"},
+        process_outputs=lambda hits: {"documents": [_as_document(h) for h in hits]},
+    )
     def search(self, query: str, k: int = 5, mode: str = "hybrid", where: dict | None = None) -> list[Hit]:
         """mode: 'bm25' | 'vector' | 'hybrid'. `where` filters on metadata, e.g.
         {"collection": "dc_sops"} or {"doc_type": "sds"}."""

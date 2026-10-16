@@ -1,0 +1,180 @@
+# Golden set for RETRIEVAL evaluation (step 4).
+#
+# Each question is phrased the way a DC employee would ask it - deliberately NOT copying
+# the source wording, so pure keyword matching has no unfair advantage.
+#
+# `evidence`: short phrase(s) from the source that answer the question. A retrieved chunk
+# counts as relevant if it contains ANY of the phrases (case/whitespace-insensitive).
+# This makes the metric independent of how the text was chunked, so different chunking
+# strategies can be compared on the same questions.
+#
+# `category`: regulation | standard | sop | sds | incident  (for per-category results)
+
+- id: R01
+  category: regulation
+  question: How often does a forklift driver's performance need to be re-evaluated?
+  evidence: ["conducted at least once every three years"]
+- id: R02
+  category: regulation
+  question: A forklift operator had a near miss. Do they need more training?
+  evidence: ["involved in an accident or near-miss incident"]
+- id: R03
+  category: regulation
+  question: What should a lift truck driver do when approaching an intersection where they can't see?
+  evidence: ["slow down and sound the horn at cross aisles"]
+- id: R04
+  category: regulation
+  question: What has to be done before the operator walks away from the truck?
+  evidence: ["load engaging means shall be fully lowered, controls shall be neutralized"]
+- id: R05
+  category: regulation
+  question: What facilities are needed where forklift batteries are charged?
+  evidence: ["flushing and neutralizing spilled electrolyte"]
+- id: R06
+  category: regulation
+  question: How far can staff be from an extinguisher in an area with flammable liquids?
+  evidence: ["class b hazard area to any extinguisher is 50 feet"]
+- id: R07
+  category: regulation
+  question: How frequently do portable fire extinguishers have to be checked by eye?
+  evidence: ["shall be visually inspected monthly"]
+- id: R08
+  category: regulation
+  question: Do warehouse workers need access to chemical safety sheets during their shift?
+  evidence: ["readily accessible during each work shift"]
+- id: R09
+  category: regulation
+  question: Which hazmat packages does the truck loading segregation rule apply to?
+  evidence: ["in packages that must be labeled or placarded"]
+- id: R10
+  category: regulation
+  question: In the hazmat compatibility chart, what does an O mean?
+  evidence: ["unless separated in a manner that"]
+- id: R11
+  category: regulation
+  question: Can corrosive liquids be loaded right next to oxidizers on a trailer?
+  evidence: ["liquids may not be loaded above or adjacent to"]
+- id: R12
+  category: regulation
+  question: How must hazardous material packages be secured inside a truck?
+  evidence: ["must be secured against shifting, including relative motion between packages"]
+- id: R13
+  category: regulation
+  question: What colors is the limited quantity diamond mark?
+  evidence: ["the border forming the square-on-point must be black"]
+- id: R14
+  category: regulation
+  question: How should stored pallets be stacked so they don't fall over?
+  evidence: ["limited in height so that they are stable and secure against sliding or collapse"]
+- id: R15
+  category: regulation
+  question: Can we temporarily park a pallet in an emergency exit corridor?
+  evidence: ["no materials or equipment may be placed, either permanently or temporarily, within the exit route"]
+- id: R16
+  category: regulation
+  question: What fire rating is required for a room storing flammable liquids indoors?
+  evidence: ["inside storage rooms shall be constructed to meet the required fire-resistive rating"]
+- id: S01
+  category: standard
+  question: At what height should the barcode be on a pallet label?
+  evidence: ["between 400 millimetres (16 inches) and 800 millimetres (32 inches)"]
+- id: S02
+  category: standard
+  question: What is the one thing every pallet label must always contain?
+  evidence: ["the only mandatory requirement is that each logistic unit must be identified with a unique serial number"]
+- id: S03
+  category: standard
+  question: The pallet already has a label but the carrier needs more info on it. Where does the extra info go?
+  evidence: ["additional transport data is best added on an extra label"]
+- id: S04
+  category: standard
+  question: Goods go through a cross-dock first. Which address goes on the ship-to field?
+  evidence: ["ship to information must relate to the physical address of the terminal"]
+- id: S05
+  category: standard
+  question: Which linear barcode type is preferred because field scanners support it?
+  evidence: ["use of gs1-128 is preferred as the scanners in the field today pervasively support it"]
+- id: P01
+  category: sop
+  question: A pallet showed up with no SSCC label. Where do I put it?
+  evidence: ["move the pallet to the exception lane in zone d"]
+- id: P02
+  category: sop
+  question: The barcode won't scan. Am I allowed to type the number in by hand?
+  evidence: ["two-person verification"]
+- id: P03
+  category: sop
+  question: When does a supplier end up on the extra inspection list?
+  evidence: ["two or more label exceptions"]
+- id: P04
+  category: sop
+  question: If two hazmat classes need separation, do we separate them inside the trailer?
+  evidence: ["does not attempt in-trailer separation"]
+- id: P05
+  category: sop
+  question: Can pool shock and chlorine tablets travel on the same truck?
+  evidence: ["never adjacent, never in the same overpack"]
+- id: P06
+  category: sop
+  question: How do we know a shipment for tomorrow morning might leave late?
+  evidence: ["no trailer assigned the afternoon before an early departure"]
+- id: P07
+  category: sop
+  question: When do we have to tell the customer their delivery is delayed?
+  evidence: ["revised eta is more than 2 hours later than promised"]
+- id: P08
+  category: sop
+  question: Who needs to know right away about incompatible hazmat on one trailer?
+  evidence: ["ehs coordinator + site ops manager"]
+- id: P09
+  category: sop
+  question: What happens to the driver after a forklift near miss here?
+  evidence: ["automatically creates a refresher training task"]
+- id: P10
+  category: sop
+  question: What should we never use to soak up a spilled oxidizer?
+  evidence: ["never use sawdust or other combustible absorbents on oxidizers"]
+- id: P11
+  category: sop
+  question: How long can a lot stay on quality hold?
+  evidence: ["dispositioned within 10 working days"]
+- id: P12
+  category: sop
+  question: How often do we count hazardous products?
+  evidence: ["hazmat skus are always class a"]
+- id: D01
+  category: sds
+  question: What is the flash point of the acetone nail polish remover?
+  evidence: ["flash point approx. -20 c"]
+- id: D02
+  category: sds
+  question: What happens if someone mixes bleach with an ammonia cleaner?
+  evidence: ["ammonia-containing cleaners (releases chloramines)", "ammonia and amines (chloramines)"]
+- id: D03
+  category: sds
+  question: How do you fight a fire involving pool shock?
+  evidence: ["use large amounts of water only"]
+- id: D04
+  category: sds
+  question: What protective gear do I need to clean up spilled drain opener?
+  evidence: ["face shield, chemical goggles, alkali-resistant gloves and apron"]
+- id: D05
+  category: sds
+  question: What UN number goes on the hydrogen peroxide drums?
+  evidence: ["| un number | un2014 |"]
+- id: D06
+  category: sds
+  question: Why must chlorine tablets never touch calcium hypochlorite?
+  evidence: ["calcium hypochlorite and other hypochlorites - mixing can cause fire or explosion"]
+- id: I01
+  category: incident
+  question: Has bleach recently leaked near the oxidizer area?
+  evidence: ["liquid reached the floor near oxidizer bay h3 boundary"]
+- id: I02
+  category: incident
+  question: Have we had cases where two professional orders were combined without checking hazmat compatibility?
+  evidence: ["load plan combined two professional orders without running the segregation check"]
+- id: I03
+  category: incident
+  question: Any past forklift near misses caused by a pedestrian in a forklift aisle?
+  evidence: ["pedestrian walked through a forklift-only aisle"]

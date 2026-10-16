@@ -7,7 +7,7 @@ Each step ends with something that runs and is tested, and is one git commit (or
 | 1 | **Setup + corpus download** | Project skeleton, `download.py`, manifest of 15 sources | done |
 | 2 | **Parse + chunk** | eCFR XML → section/paragraph chunks with citations; GS1 PDFs → heading chunks; all to `chunks.jsonl` (1,636 chunks, 539k tokens) | done |
 | 3 | **Synthetic DC data** | 15 SOPs, 16 SDS, 205 incident reports; SQLite WMS (1.2k shipments, 367 exceptions, 6 planted scenarios); corpus now 1,896 chunks | done |
-| 4 | **Retrieval baseline** | Embeddings + ChromaDB + BM25 hybrid; small golden set; recall@5 measured | |
+| 4 | **Retrieval baseline** | BM25 + ChromaDB vectors + RRF hybrid; 42-question golden set; structured vs naive chunking compared | BM25 done; vector/hybrid run pending API key |
 | 5 | **Tools** | Read-only SQL tool, Hazmat Table lookup, 177.848 segregation checker (unit-tested) | |
 | 6 | **Agents (LangGraph)** | Supervisor + knowledge + ops agents; cited answers; human-approval step for actions | |
 | 7 | **API + UI** | FastAPI `/ask` endpoint; Streamlit chat with sources panel and trace view | |

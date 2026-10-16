@@ -72,6 +72,8 @@ cp .env.example .env                      # add your API key
 uv run python -m copilot.ingest.download  # fetch corpus (~18 MB) into data/raw/
 uv run python -m copilot.synthetic.build_wms  # synthetic DC: data/dc.db, incidents, SDS
 uv run python -m copilot.ingest.build_chunks  # parse + chunk -> data/processed/chunks.jsonl
+uv run python -m copilot.retrieval.naive_chunks   # baseline chunks for comparison
+uv run python -m copilot.eval.retrieval_eval      # retrieval metrics -> data/eval/results/
 uv run pytest                             # run tests
 ```
 
@@ -85,5 +87,16 @@ data/dc.db         synthetic warehouse database (git-ignored, regenerate)
 src/copilot/       package: ingest/, retrieval/, agents/, tools/, api/
 tests/             unit tests + eval suite
 ```
+
+## Retrieval
+
+Hybrid search over the chunks: **BM25** keyword search (exact codes like `UN1950`,
+`177.848`) + **vector search** in ChromaDB with OpenAI `text-embedding-3-small`
+(paraphrases), fused with **Reciprocal Rank Fusion**. Embeddings are cached on disk, so
+re-indexing only pays for changed chunks (full corpus is about $0.01).
+
+Evaluated on a 42-question golden set ([data/eval/retrieval_golden.yaml](data/eval/retrieval_golden.yaml))
+against a naive LangChain `RecursiveCharacterTextSplitter` baseline. Latest results:
+[data/eval/results/retrieval.md](data/eval/results/retrieval.md).
 
 See [ROADMAP.md](ROADMAP.md) for build steps.

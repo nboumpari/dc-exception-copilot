@@ -16,6 +16,7 @@ from lxml import etree
 from copilot.ingest.chunking import Chunk, make_chunks
 
 _LABEL = re.compile(r"^\(([a-z0-9]{1,5})\)")
+_RANGE = re.compile(r"^\(([a-z])\)\s*[-–]\s*\(([a-z])\)")
 _WRAPPERS = {"EXTRACT", "DIV"}  # containers we read through
 _SKIP = {"CITA", "EDNOTE", "PSPACE", "img", "SECAUTH", "AUTH", "SOURCE"}
 _HEADINGS = {"HD1": 0, "HD2": 1, "HD3": 2}
@@ -48,7 +49,11 @@ def table_to_markdown(table: etree._Element) -> str:
 
 
 def iter_blocks(parent: etree._Element) -> Iterator[tuple[str, str]]:
-    """Yield (kind, text) in document order: kind is 'heading:<level>', 'p', 'table'."""
+    """Yield (kind, text) in document order: kind is 'heading:<level>', 'p', 'p_deep', 'table'.
+
+    'p_deep' marks paragraphs with an italic label like (<I>c</I>): these are level-5
+    sub-paragraphs that reuse the letters a, b, c... and must never start a top-level unit.
+    """
     for el in parent.iterchildren():
         tag = el.tag if isinstance(el.tag, str) else ""
         if not tag or tag in _SKIP or tag == "HEAD":
@@ -68,7 +73,8 @@ def iter_blocks(parent: etree._Element) -> Iterator[tuple[str, str]]:
         else:  # P, FP, FP-2, ...
             text = clean(el)
             if text:
-                yield "p", text
+                italic_label = (el.text or "").strip() == "(" and len(el) and el[0].tag == "I"
+                yield ("p_deep" if italic_label else "p"), text
 
 
 def _is_next_top_label(label: str, current: str | None) -> bool:
@@ -135,6 +141,10 @@ def parse_ecfr(path: Path, source_id: str, url: str) -> list[Chunk]:
             if m and _is_next_top_label(m.group(1), top):
                 top = m.group(1)
                 new_unit(f"{citation_base}({top})", [section_title, _paragraph_title(text)])
+                # "(c)-(d) [Reserved]" covers two letters: the next real paragraph is (e)
+                rng = _RANGE.match(text)
+                if rng:
+                    top = rng.group(2)
         units[-1][2].append(text)
 
     chunks: list[Chunk] = []

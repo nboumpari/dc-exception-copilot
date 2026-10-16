@@ -7,9 +7,12 @@ SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
 <P>(1) First sub-paragraph.</P>
 <P>(b) Pallets must be stacked safely.</P>
 <P>(i) Roman numeral under (b), not a new top-level paragraph.</P>
+<P>(<I>c</I>) Deep italic sub-paragraph under (b), not paragraph (c).</P>
 <DIV><TABLE><CAPTION><P>Max stack height</P></CAPTION>
 <THEAD><TR><TH>Class</TH><TH>Height</TH></TR></THEAD>
 <TBODY><TR><TD>3</TD><TD>2 m</TD></TR></TBODY></TABLE></DIV>
+<P>(c)-(d) [Reserved]</P>
+<P>(e) Paragraph after a reserved range.</P>
 <EXTRACT>
 <HD1>Appendix A to § 9.1—Examples (Non-mandatory)</HD1>
 <HD1>A.1 Example one</HD1>
@@ -34,11 +37,14 @@ def test_parse_ecfr_citations_tables_and_appendix(tmp_path):
     chunks = parse_ecfr(path, "demo", "https://example.org")
 
     by_cite = {c.citation: c for c in chunks}
-    assert set(by_cite) == {"99 CFR 9.1(a)", "99 CFR 9.1(b)", "99 CFR 9.1 App. A A.1"}
+    assert set(by_cite) == {
+        "99 CFR 9.1(a)", "99 CFR 9.1(b)", "99 CFR 9.1(c)", "99 CFR 9.1(e)", "99 CFR 9.1 App. A A.1"
+    }
 
     assert by_cite["99 CFR 9.1(a)"].section_path == ["Demo storage rules", "(a) Scope."]
     b = by_cite["99 CFR 9.1(b)"].body
     assert "(i) Roman numeral" in b
+    assert "Deep italic sub-paragraph" in b
     assert "Table: Max stack height" in b and "| 3 | 2 m |" in b
     assert all("source note" not in c.body for c in chunks)
 

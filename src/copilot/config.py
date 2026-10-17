@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     chat_model: str = "gpt-5.4-mini"  # agent LLM; any tool-calling OpenAI model works
     reasoning_effort: str = "low"  # none | low | medium | high
-    judge_model: str = "gpt-5.4"  # grades answers in evaluation; stronger than the agent model
+    # evaluation judge: a different provider than the agent (avoids self-preference bias)
+    judge_provider: str = "google"  # google | openai
+    judge_model: str = ""  # empty = provider default (see eval/agent_eval.py)
+    google_api_key: str = ""
 
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""

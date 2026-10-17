@@ -151,30 +151,41 @@ uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
 36 end-to-end test cases ([data/eval/agent_golden.yaml](data/eval/agent_golden.yaml)): the
 planted shipment scenarios, data questions, procedures, regulations, safety data sheets,
 questions the agent should decline, manipulation attempts and actions needing approval.
-Everything checkable in code is checked in code (tools used, required citations, key facts,
-forbidden claims, citation validity, approval flow); an LLM judge (`gpt-5.4`, stronger than
-the agent) grades only correctness and completeness against a reference answer. Proposed
-actions are always rejected by the evaluator, so nothing is ever sent.
+Proposed actions are always rejected by the evaluator, so nothing is ever sent.
 
-LLM answers vary between runs, so each case runs 3 times:
+**Two kinds of checks.** Six checks are plain code - deterministic, free, transparent: were
+the required tools called, is the required citation present, does the answer contain the
+key facts, does it avoid forbidden claims ("email was sent"), is every citation real, was an
+action proposed for approval. Two checks need meaning, so an **LLM judge** grades them:
+does anything contradict the reference answer, and does it cover the main points.
 
-| | Baseline | After fixes |
-|---|---|---|
-| Pass rate (all checks) | 64% (1 run) | **87%** (runs: 86%, 86%, 89%) |
-| Judge: correct | 83% | 99% |
-| Citations valid | 100% | 99% |
-| Shipments / safety / SDS / actions | 83% / 100% / 33% / 50% | **100%** each |
+**The judge is from a different provider than the agent.** The agent runs on OpenAI
+(`gpt-5.4-mini`); the judge is Google `gemini-3.8-flash` (pinned version), because a model
+grading its own family's answers tends to favour them. Validation: both Gemini and OpenAI
+`gpt-5.4` re-graded the same 108 answers and agreed on 99% (correct) and 95% (complete); on
+the 6 disagreements, a manual check of the sources sided with Gemini 5 times (1 tie) -
+the OpenAI judge penalised omissions the question had not asked about
+([data/eval/results/judge_comparison.md](data/eval/results/judge_comparison.md)).
 
-What changed: a `read_source` tool (search finds a source, the agent reads it in full
-before saying "not found"), a `carrier_performance` tool (KPIs use the official definition
-instead of LLM-written SQL), prompt rules for reporting all findings, SQL name matching and
-escalation questions. Golden-set references were corrected only where checking the sources
-proved the agent right (documented as "label review"). Weakest remaining area: complete
-multi-step procedures (63%). Full report: [data/eval/results/agent.md](data/eval/results/agent.md).
+LLM answers vary, so each case runs 3 times:
+
+| | Baseline | After agent fixes (OpenAI judge) | Same answers, Gemini judge |
+|---|---|---|---|
+| Pass rate (all checks) | 64% (1 run) | 87% (86 / 86 / 89%) | **93%** (94 / 89 / 94%) |
+| Judge: correct | 83% | 99% | 100% |
+| Citations valid | 100% | 99% | 99% |
+
+The step from 64% to 87% mixes agent improvements (a `read_source` tool to read a found
+source in full, a `carrier_performance` tool so KPIs use the official definition, prompt
+rules for reporting all findings, SQL name matching and escalation) with golden-set
+corrections where checking the sources proved the agent right ("label review" in the file).
+The step from 87% to 93% is the judge alone - same answers. Weakest area: data questions
+(83%; one SQL name-matching case is flaky). Report: [data/eval/results/agent.md](data/eval/results/agent.md).
 
 ```bash
 uv run python -m copilot.eval.agent_eval --repeats 3   # local report
 uv run python -m copilot.eval.agent_eval --langsmith   # LangSmith experiment
+uv run python -m copilot.eval.agent_eval --rejudge     # re-grade saved answers with the current judge
 ```
 
 ## Agent tools

@@ -14,7 +14,8 @@ Scoring - everything checkable in code is checked in code:
   no_forbidden       no must_not_mention phrase appears
   citations_valid    every citation in the answer matches a tool result
   action             an action was proposed for human approval iff one was expected
-An LLM judge (a stronger model than the agent) grades only what code cannot:
+An LLM judge from a different provider than the agent (Gemini by default - a judge from the
+agent's own model family tends to favour its answers) grades only what code cannot:
   judge_correct      nothing in the answer contradicts the reference
   judge_complete     the answer covers the reference's main points
 A case PASSES when every applicable check scores 1.
@@ -39,6 +40,7 @@ from copilot.synthetic.catalog import SIM_NOW
 CASES_PATH = DATA_DIR / "eval" / "agent_golden.yaml"
 RESULTS_DIR = DATA_DIR / "eval" / "results"
 CONCURRENCY = 4
+JUDGE_CONCURRENCY = 3  # keep under free-tier rate limits
 
 
 def load_cases(ids: list[str] | None = None) -> list[dict]:
@@ -130,11 +132,30 @@ Grade strictly on substance:
 - Write the explanation in English."""
 
 
-def make_judge():
-    from langchain_openai import ChatOpenAI
+DEFAULT_JUDGE_MODELS = {"google": "gemini-3.8-flash", "openai": "gpt-5.4"}  # pinned versions
 
-    model = ChatOpenAI(model=settings.judge_model, api_key=settings.openai_api_key,
-                       use_responses_api=True, reasoning={"effort": "low"})
+
+def judge_name() -> str:
+    """provider:model of the judge, e.g. 'google:gemini-2.5-pro'."""
+    return f"{settings.judge_provider}:{settings.judge_model or DEFAULT_JUDGE_MODELS[settings.judge_provider]}"
+
+
+def make_judge():
+    """The judge comes from a different provider than the agent (OpenAI) by default:
+    a model grading answers from its own family tends to favour them."""
+    model_name = settings.judge_model or DEFAULT_JUDGE_MODELS[settings.judge_provider]
+    if settings.judge_provider == "google":
+        if not settings.google_api_key:
+            raise SystemExit("GOOGLE_API_KEY is not set in .env (needed for the Gemini judge).")
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        model = ChatGoogleGenerativeAI(model=model_name, api_key=settings.google_api_key,
+                                       temperature=0)
+    else:
+        from langchain_openai import ChatOpenAI
+
+        model = ChatOpenAI(model=model_name, api_key=settings.openai_api_key,
+                           use_responses_api=True, reasoning={"effort": "low"})
     return model.with_structured_output(Verdict)
 
 
@@ -178,7 +199,7 @@ def evaluate_local(cases: list[dict], use_judge: bool = True, repeats: int = 1) 
             scores.update(js)
         return {"id": case["id"], "category": case["category"], "question": case["question"],
                 "repeat": repeat, **out, "scores": scores, "judge_note": note,
-                "passed": passed(scores)}
+                "judge": judge_name() if judge else None, "passed": passed(scores)}
 
     jobs = [(r, c) for r in range(repeats) for c in cases]
     with ThreadPoolExecutor(CONCURRENCY) as pool:
@@ -198,7 +219,7 @@ def report(rows: list[dict]) -> str:
     lines = [
         "# Agent evaluation", "",
         (f"Model `{settings.chat_model}` (reasoning: {settings.reasoning_effort}), judge "
-         f"`{settings.judge_model}`. {len(ids)} cases x {repeats} run(s)."), "",
+         f"`{judge_name()}`. {len(ids)} cases x {repeats} run(s)."), "",
         (f"**Pass rate: {mean(per_run):.0%}**{spread} - a case passes when every check "
          "scores 1."),
         "", "| Metric | Score | Answers |", "|---|---|---|",
@@ -267,9 +288,52 @@ def evaluate_langsmith(cases: list[dict], use_judge: bool = True) -> str:
                       experiment_prefix=f"agent-{settings.chat_model}",
                       metadata={"chat_model": settings.chat_model,
                                 "reasoning_effort": settings.reasoning_effort,
-                                "judge_model": settings.judge_model},
+                                "judge": judge_name()},
                       max_concurrency=CONCURRENCY, client=client)
     return result.experiment_name
+
+
+def rejudge(rows: list[dict], cases: list[dict]) -> list[dict]:
+    """Re-grade saved answers with the current judge - the agent is NOT re-run, so judges
+    can be compared on identical answers."""
+    judge = make_judge()
+    by_id = {c["id"]: c for c in cases}
+
+    def one(row: dict) -> dict:
+        scores = {k: v for k, v in row["scores"].items() if not k.startswith("judge_")}
+        js, note = judge_scores(judge, by_id[row["id"]], row)
+        scores.update(js)
+        return {**row, "scores": scores, "judge_note": note, "judge": judge_name(),
+                "passed": passed(scores),
+                "previous_judge": {"judge": row.get("judge") or "openai:gpt-5.4",
+                                   **{k: v for k, v in row["scores"].items() if k.startswith("judge_")},
+                                   "note": row.get("judge_note", "")}}
+
+    with ThreadPoolExecutor(JUDGE_CONCURRENCY) as pool:
+        return list(pool.map(one, rows))
+
+
+def judge_agreement(rows: list[dict]) -> str:
+    """Markdown comparison of the current and previous judge on the same answers."""
+    lines = ["# Judge comparison", "",
+             (f"Same {len(rows)} answers graded by two judges: "
+             f"`{rows[0]['previous_judge']['judge']}` (previous) vs `{rows[0]['judge']}` (current)."),
+             "", "| Check | Agreement | Previous judge passes | Current judge passes |",
+             "|---|---|---|---|"]
+    disagreements = []
+    for key in ("judge_correct", "judge_complete"):
+        pairs = [(r["previous_judge"][key], r["scores"][key]) for r in rows]
+        agree = sum(a == b for a, b in pairs) / len(pairs)
+        lines.append(f"| {key} | {agree:.0%} | {sum(a for a, _ in pairs) / len(pairs):.0%} | "
+                     f"{sum(b for _, b in pairs) / len(pairs):.0%} |")
+        disagreements += [(r, key) for r in rows if r["previous_judge"][key] != r["scores"][key]]
+    lines += ["", "## Disagreements", ""]
+    for r, key in sorted(disagreements, key=lambda x: (x[0]["id"], x[0]["repeat"])):
+        lines.append(f"- **{r['id']}** run {r['repeat']} `{key}`: previous="
+                     f"{r['previous_judge'][key]:.0f}, current={r['scores'][key]:.0f}  \n"
+                     f"  previous: {r['previous_judge']['note']}  \n"
+                     f"  current: {r['judge_note']}")
+    return "\n".join(lines) + "\n"
 
 
 def main() -> None:
@@ -278,9 +342,24 @@ def main() -> None:
     parser.add_argument("--no-judge", action="store_true", help="skip the LLM judge")
     parser.add_argument("--langsmith", action="store_true", help="run as a LangSmith experiment")
     parser.add_argument("--repeats", type=int, default=1, help="runs per case (answers vary)")
+    parser.add_argument("--rejudge", action="store_true",
+                        help="re-grade the saved answers in results/agent.json with the current "
+                             "judge (no agent runs) and compare with the previous judge")
     args = parser.parse_args()
     cases = load_cases(args.cases.split(",") if args.cases else None)
     setup_tracing(project=f"{settings.langsmith_project}-eval")
+
+    if args.rejudge:
+        saved = json.loads((RESULTS_DIR / "agent.json").read_text(encoding="utf-8"))
+        rows = rejudge(saved, load_cases())
+        (RESULTS_DIR / "agent.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False),
+                                                encoding="utf-8")
+        (RESULTS_DIR / "judge_comparison.md").write_text(judge_agreement(rows), encoding="utf-8")
+        md = report(rows)
+        (RESULTS_DIR / "agent.md").write_text(md, encoding="utf-8")
+        print(judge_agreement(rows).split("## Disagreements")[0])
+        print(md.split("## Cases")[0])
+        return
 
     if args.langsmith:
         print("LangSmith experiment:", evaluate_langsmith(cases, not args.no_judge))

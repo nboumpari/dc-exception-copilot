@@ -8,6 +8,7 @@ Defense in depth, so a confused or manipulated agent cannot change data:
 Errors are returned as data, so the agent can read them and fix its query.
 """
 
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -18,6 +19,9 @@ from copilot.synthetic.catalog import SIM_NOW
 
 MAX_ROWS = 100
 TIMEOUT_S = 5.0
+MAX_ENUM_VALUES = 15  # list a TEXT column's values when it has at most this many
+_FREE_TEXT = {"description", "root_cause", "corrective_action", "name", "proper_shipping_name",
+              "pack_size", "lot", "city", "trailer_id", "pallet_sscc"}
 
 _ALLOWED = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION,
             sqlite3.SQLITE_RECURSIVE}
@@ -50,6 +54,31 @@ COLUMN_NOTES = {
 }
 
 
+_EQ_LITERAL = re.compile(r"=\s*'([^']{2,60})'")
+_NAME_COLUMNS = (("customers", "name"), ("suppliers", "name"), ("carriers", "name"),
+                 ("employees", "name"), ("skus", "description"))
+
+
+def _empty_result_hints(con, query: str, rows: list) -> list[str]:
+    """When a query finds nothing (no rows, or one row of zeros such as COUNT(*) = 0) and it
+    compared a name with '=', check whether that name exists partially. Evaluation showed
+    the agent sometimes reported "0" after WHERE name = 'ValueMart' (real name: 'ValueMart
+    Regional DC') despite prompt rules - the tool now says so at the moment it matters."""
+    looks_empty = not rows or (len(rows) == 1 and all(v in (0, None) for v in rows[0]))
+    if not looks_empty:
+        return []
+    hints = []
+    for literal in dict.fromkeys(_EQ_LITERAL.findall(query)):
+        for table, col in _NAME_COLUMNS:
+            matches = [r[0] for r in con.execute(
+                f'SELECT "{col}" FROM "{table}" WHERE "{col}" LIKE ? AND "{col}" <> ? LIMIT 3',
+                (f"%{literal}%", literal))]
+            if matches:
+                hints.append(f"'{literal}' matched nothing exactly, but {table}.{col} has "
+                             f"{matches} - filter with LIKE '%{literal}%' or by ID.")
+    return hints
+
+
 def _authorizer(action, *_):
     return sqlite3.SQLITE_OK if action in _ALLOWED else sqlite3.SQLITE_DENY
 
@@ -75,12 +104,16 @@ def sql_query(query: str, db_path: Path = DC_DB_PATH) -> dict:
         cur = con.execute(query)
         rows = cur.fetchmany(MAX_ROWS + 1)
         columns = [d[0] for d in cur.description or []]
-        return {
+        result = {
             "columns": columns,
             "rows": [list(r) for r in rows[:MAX_ROWS]],
             "row_count": min(len(rows), MAX_ROWS),
             "truncated": len(rows) > MAX_ROWS,
         }
+        hints = _empty_result_hints(con, query, rows)
+        if hints:
+            result["hint"] = " ".join(hints)
+        return result
     except (sqlite3.Error, sqlite3.Warning) as exc:
         msg = str(exc)
         if "not authorized" in msg:
@@ -105,6 +138,16 @@ def describe_schema(db_path: Path = DC_DB_PATH) -> str:
             lines.append(f"{t}(" + ", ".join(f"{n} {typ}" for n, typ in cols) + ")")
             for col, note in COLUMN_NOTES.get(t, {}).items():
                 lines.append(f"  - {col}: {note}")
+            # Exact values of short categorical columns, read from the data: without them the
+            # model guessed 'UNREADABLE_SSCC' for 'UNREADABLE_LABEL' and silently got no rows.
+            for col, typ in cols:
+                if typ != "TEXT" or col.endswith(("_id", "_at")) or col in _FREE_TEXT:
+                    continue
+                values = [r[0] for r in con.execute(
+                    f'SELECT DISTINCT "{col}" FROM "{t}" WHERE "{col}" IS NOT NULL '
+                    f"ORDER BY 1 LIMIT {MAX_ENUM_VALUES + 1}")]
+                if 0 < len(values) <= MAX_ENUM_VALUES:
+                    lines.append(f"  - {col} values: " + ", ".join(repr(v) for v in values))
         return "\n".join(lines)
     finally:
         con.close()

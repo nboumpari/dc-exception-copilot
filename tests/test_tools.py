@@ -6,6 +6,7 @@ from copilot.config import RAW_DIR
 from copilot.synthetic.build_wms import Generator, write_db
 from copilot.tools import sql
 from copilot.tools.hazmat import build_reference_db, lookup_hazmat
+from copilot.tools.receipts import assess_inbound_receipt
 from copilot.tools.search import choose_mode
 from copilot.tools.segregation import LoadItem, _classes, check_load, pair_code
 from copilot.tools.shipments import assess_departure_risk, check_shipment_compliance
@@ -57,6 +58,27 @@ def test_sql_row_limit_and_timeout(dc, monkeypatch):
     monkeypatch.setattr(sql, "TIMEOUT_S", 0.2)
     endless = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) SELECT COUNT(*) FROM n"
     assert "exceeded" in sql.sql_query(endless, db_path=path)["error"]
+
+
+def test_empty_result_from_exact_name_match_gets_a_hint(dc):
+    path, _ = dc
+    r = sql.sql_query("SELECT COUNT(*) FROM shipments s JOIN customers c USING (customer_id) "
+                      "WHERE c.name = 'ValueMart'", db_path=path)
+    assert r["rows"] == [[0]] and "ValueMart Regional DC" in r["hint"]
+
+
+def test_no_hint_when_nothing_exists_or_rows_are_found(dc):
+    path, _ = dc
+    assert "hint" not in sql.sql_query("SELECT * FROM shipments WHERE status = 'cancelled'",
+                                       db_path=path)
+    assert "hint" not in sql.sql_query("SELECT COUNT(*) FROM shipments", db_path=path)
+
+
+def test_schema_lists_exact_category_values(dc):
+    path, _ = dc
+    text = sql.describe_schema(db_path=path)
+    assert "'UNREADABLE_LABEL'" in text and "'MISSING_SSCC'" in text  # no guessing enum names
+    assert "description values" not in text  # free text is not enumerated
 
 
 def test_schema_description_has_tables_and_conventions(dc):
@@ -167,6 +189,23 @@ def test_reliable_planned_shipment_is_not_at_risk(dc):
 def test_unknown_shipment_returns_error(dc):
     path, _ = dc
     assert "error" in check_shipment_compliance("SHP-99999", db_path=path)
+
+
+# ---------- inbound receipts ----------
+def test_inbound_from_problem_supplier_gets_enhanced_inspection(dc):
+    path, sc = dc
+    r = assess_inbound_receipt(sc["inbound_s014"], db_path=path)
+    assert r["receipt"]["supplier_id"] == "S-014"
+    assert r["enhanced_inspection"] is True
+    assert r["supplier_history_30d"]["label_exceptions"] >= 2
+    assert r["supplier_history_30d"]["recent_label_exceptions"]
+    cites = {c["citation"] for c in r["checklist"]}
+    assert "SOP-REC-002 §3-4" in cites and "SOP-HAZ-003 §4" in cites  # LQ hazmat lines
+
+
+def test_unknown_receipt_returns_error(dc):
+    path, _ = dc
+    assert "error" in assess_inbound_receipt("RCV-99999", db_path=path)
 
 
 # ---------- search mode routing ----------

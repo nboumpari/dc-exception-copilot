@@ -1,8 +1,19 @@
 """Central settings and project paths. Values come from environment variables / .env."""
 
+import os
+import warnings
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Some environments (e.g. an activated Anaconda base env on Windows) export certificate
+# paths that do not exist; HTTPS clients then crash on start-up. Ignore them with a warning
+# so the default system certificates are used instead.
+for _var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
+    _path = os.environ.get(_var)
+    if _path and not Path(_path).exists():
+        del os.environ[_var]
+        warnings.warn(f"Ignoring {_var}={_path!r}: file does not exist.", stacklevel=1)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PROJECT_ROOT / "config"

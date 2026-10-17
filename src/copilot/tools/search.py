@@ -7,7 +7,7 @@ because keyword matching is what finds exact codes.
 """
 
 import re
-from functools import lru_cache
+import threading
 from typing import Literal
 
 from copilot.observability import traceable
@@ -19,11 +19,21 @@ _IDENTIFIER = re.compile(
 SNIPPET_CHARS = 1500
 
 
-@lru_cache(maxsize=1)
-def _retriever() -> Retriever:
-    from copilot.retrieval.embeddings import openai_embedder
+_lock = threading.Lock()
+_instance: Retriever | None = None
 
-    return Retriever(load_chunks(), openai_embedder())
+
+def _retriever() -> Retriever:
+    """Shared retriever, built once. The agent runs parallel tool calls in threads, so
+    construction is locked (two threads opening ChromaDB at once crashed its client)."""
+    global _instance
+    if _instance is None:
+        with _lock:
+            if _instance is None:
+                from copilot.retrieval.embeddings import openai_embedder
+
+                _instance = Retriever(load_chunks(), openai_embedder())
+    return _instance
 
 
 def choose_mode(query: str) -> str:

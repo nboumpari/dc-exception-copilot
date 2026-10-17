@@ -4,7 +4,7 @@ An agentic RAG assistant that helps distribution-center (DC) staff resolve wareh
 exceptions: hazmat loading questions, pallet-label problems, shipments at risk, and
 safety/handling questions — grounded in real regulations and the DC's own data.
 
-> Runs entirely on a laptop: SQLite + a local vector store + an LLM API.
+> Runs on SQLite + a local vector store + an LLM API.
 > All documents are free and public; downloaded by script, never committed.
 
 ## Example questions

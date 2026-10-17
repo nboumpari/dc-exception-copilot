@@ -146,6 +146,37 @@ uv run python -m copilot.agent.cli                       # interactive chat
 uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
 ```
 
+## Agent evaluation
+
+36 end-to-end test cases ([data/eval/agent_golden.yaml](data/eval/agent_golden.yaml)): the
+planted shipment scenarios, data questions, procedures, regulations, safety data sheets,
+questions the agent should decline, manipulation attempts and actions needing approval.
+Everything checkable in code is checked in code (tools used, required citations, key facts,
+forbidden claims, citation validity, approval flow); an LLM judge (`gpt-5.4`, stronger than
+the agent) grades only correctness and completeness against a reference answer. Proposed
+actions are always rejected by the evaluator, so nothing is ever sent.
+
+LLM answers vary between runs, so each case runs 3 times:
+
+| | Baseline | After fixes |
+|---|---|---|
+| Pass rate (all checks) | 64% (1 run) | **87%** (runs: 86%, 86%, 89%) |
+| Judge: correct | 83% | 99% |
+| Citations valid | 100% | 99% |
+| Shipments / safety / SDS / actions | 83% / 100% / 33% / 50% | **100%** each |
+
+What changed: a `read_source` tool (search finds a source, the agent reads it in full
+before saying "not found"), a `carrier_performance` tool (KPIs use the official definition
+instead of LLM-written SQL), prompt rules for reporting all findings, SQL name matching and
+escalation questions. Golden-set references were corrected only where checking the sources
+proved the agent right (documented as "label review"). Weakest remaining area: complete
+multi-step procedures (63%). Full report: [data/eval/results/agent.md](data/eval/results/agent.md).
+
+```bash
+uv run python -m copilot.eval.agent_eval --repeats 3   # local report
+uv run python -m copilot.eval.agent_eval --langsmith   # LangSmith experiment
+```
+
 ## Agent tools
 
 Plain Python functions the agent calls. Safety- and compliance-critical decisions are made by
@@ -157,7 +188,8 @@ deterministic, tested code - the LLM chooses a tool and explains the result.
 | `lookup_hazmat` | 49 CFR 172.101 Hazardous Materials Table (3,000+ entries) parsed from the regulation into `data/reference.db` |
 | `check_shipment_compliance` | 177.848 segregation using the table parsed from the regulation, the limited-quantity exception, the DC's calcium hypochlorite / TCCA rule, and carrier hazmat endorsement |
 | `assess_departure_risk` | The at-risk rules of SOP-OUT-002 §3 (trailer assignment, carrier on-time rate, endorsement) |
-| `search_documents` | Retrieval with collection filters; vector search by default, hybrid when the query contains an identifier |
+| `search_documents`, `read_source` | Retrieval with collection filters (vector by default, hybrid for identifiers); read a found source in full |
+| `carrier_performance` | On-time rate per carrier using the SOP-OUT-002 definition |
 
 Every tool is traced in LangSmith and returns findings with citations.
 

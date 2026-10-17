@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     llm_provider: str = "openai"
     openai_api_key: str = ""
+    chat_model: str = "gpt-5.4-mini"  # agent LLM; any tool-calling OpenAI model works
+    reasoning_effort: str = "low"  # none | low | medium | high
 
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""

@@ -114,6 +114,38 @@ mostly DC procedures crowded out by the large GS1 corpus - addressed in the agen
 routing questions to the right collection with metadata filters. Full report:
 [data/eval/results/retrieval.md](data/eval/results/retrieval.md).
 
+## The agent
+
+A LangGraph tool-calling loop around `gpt-5.4-mini` (configurable via `CHAT_MODEL`):
+
+```mermaid
+graph LR
+    Q([question]) --> A[agent: LLM + tools]
+    A -- tool calls --> T[tools]
+    T --> A
+    A -- answer --> C{answer check}
+    C -- invented citation or stray language --> A
+    C -- ok --> R([cited answer])
+    T -. propose_action .-> H{{human approval}}
+    H -- approve / edit / reject --> T
+```
+
+- **Routing in the prompt:** data questions go to SQL, hazmat questions about a shipment
+  always go to the deterministic compliance check, procedures to the SOP collection.
+- **Citations are verified:** every bracketed citation in the answer must match a citation a
+  tool actually returned. If not, the model is told which citations are valid and rewrites
+  the answer once; anything still unverified is reported, not hidden.
+- **Human in the loop:** emails and tickets go through `propose_action`, which pauses the graph
+  (LangGraph `interrupt`) until a person approves, edits or rejects. Sends are simulated and
+  written to `data/outbox/`.
+- **Prompt-injection hygiene:** document and database text is treated as data, never as
+  instructions.
+
+```bash
+uv run python -m copilot.agent.cli                       # interactive chat
+uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
+```
+
 ## Agent tools
 
 Plain Python functions the agent calls. Safety- and compliance-critical decisions are made by

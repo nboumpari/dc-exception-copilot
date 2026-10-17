@@ -11,7 +11,7 @@ Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 | 4 | **Retrieval baseline** | BM25 + ChromaDB vectors + RRF hybrid; 42-question golden set; structured vs naive chunking compared | done |
 | 4b | **Observability** | LangSmith tracing of retrieval and embeddings; golden set as LangSmith dataset + experiments | done |
 | 5 | **Tools** | Read-only SQL, Hazardous Materials Table lookup, 177.848 segregation + shipment compliance, departure risk, document search; tested on the planted scenarios | done |
-| 6 | **Agents (LangGraph)** | Supervisor + knowledge + ops agents; cited answers; human-approval step for actions | |
+| 6 | **Agent (LangGraph)** | Single tool-calling agent (simpler and easier to evaluate than several sub-agents); cited answers with citation verification; human approval for actions; CLI | done |
 | 7 | **API + UI** | FastAPI `/ask` endpoint; Streamlit chat with sources panel and trace view | |
 | 8 | **Evaluation** | ~60-question golden set; groundedness, citation accuracy, SQL accuracy, refusal tests | |
 | 9 | **Guardrails + logging** | Prompt-injection tests, refusal when unsure, structured logs of every tool call | |

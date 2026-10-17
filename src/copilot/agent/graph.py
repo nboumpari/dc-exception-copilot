@@ -83,6 +83,7 @@ class AgentResult:
     citation_retries: int = 0
     available_citations: list[str] = field(default_factory=list)
     foreign_words: list[str] = field(default_factory=list)
+    usage: dict = field(default_factory=dict)  # LLM tokens used in this turn
 
 
 def _text(msg: AIMessage) -> str:
@@ -185,6 +186,12 @@ class Copilot:
             answer = _text(messages[-1])
         cited, unverified = check_citations(answer or "", tool_texts)
         question = str(messages[last_human].content)
+        usage = {"input_tokens": 0, "output_tokens": 0, "llm_calls": 0}
+        for m in turn:
+            if isinstance(m, AIMessage) and m.usage_metadata:
+                usage["input_tokens"] += m.usage_metadata.get("input_tokens", 0)
+                usage["output_tokens"] += m.usage_metadata.get("output_tokens", 0)
+                usage["llm_calls"] += 1
         return AgentResult(thread_id, answer, calls, cited, unverified, pending,
                            available_citations=available_citations(tool_texts),
-                           foreign_words=foreign_words(answer or "", question))
+                           foreign_words=foreign_words(answer or "", question), usage=usage)

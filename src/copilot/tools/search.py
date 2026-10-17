@@ -66,3 +66,32 @@ def search_documents(query: str, collection: Collection | None = None, k: int = 
             for h in hits
         ],
     }
+
+
+READ_CHARS = 12_000
+
+
+@traceable(run_type="tool", name="read_source")
+def read_source(reference: str) -> dict:
+    """Full text of a source found by search: a citation ('29 CFR 1910.178(l)',
+    'SOP-REC-002 §1-3') returns every passage with that citation; a document id
+    ('SDS-NPRM', 'SOP-ESC-001', 'INC-0205') returns the whole document."""
+    ref = reference.strip().strip("[]")
+    chunks = _retriever().chunks
+    hits = [c for c in chunks if c["citation"] == ref]
+    if not hits:
+        hits = [c for c in chunks if c["source_id"].lower() == ref.lower()]
+    if not hits:  # a document id inside a longer citation, e.g. 'SDS-NPRM §9'
+        doc = ref.split(" §")[0].split(" -")[0]
+        hits = [c for c in chunks if c["source_id"].lower() == doc.lower()]
+    if not hits:
+        return {"error": f"no source matches {ref!r}; use a citation or document id from search"}
+    passages, used, truncated = [], 0, False
+    for c in hits:
+        if used + len(c["body"]) > READ_CHARS:
+            truncated = True
+            break
+        passages.append({"citation": c["citation"], "text": c["body"]})
+        used += len(c["body"])
+    return {"reference": ref, "source": hits[0]["source_title"], "url": hits[0].get("url", ""),
+            "passages": passages, "truncated": truncated}

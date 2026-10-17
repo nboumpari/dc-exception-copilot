@@ -14,8 +14,10 @@ from langgraph.types import interrupt
 
 from copilot.config import DATA_DIR
 from copilot.tools.hazmat import lookup_hazmat as _lookup_hazmat
+from copilot.tools.search import read_source as _read_source
 from copilot.tools.search import search_documents as _search_documents
 from copilot.tools.shipments import assess_departure_risk as _assess_departure_risk
+from copilot.tools.shipments import carrier_performance as _carrier_performance
 from copilot.tools.shipments import check_shipment_compliance as _check_shipment_compliance
 from copilot.tools.sql import sql_query as _sql_query
 
@@ -78,6 +80,23 @@ def search_documents(
 
 
 @tool
+def read_source(reference: Annotated[str, "a citation or document id from a search result, "
+                                          "e.g. '29 CFR 1910.178(l)', 'SDS-NPRM', 'SOP-ESC-001'"]) -> str:
+    """Read the FULL text of a source found by search_documents. Search returns short
+    snippets; when the right source appears but the snippet lacks the exact detail, read it
+    here before concluding the information is missing."""
+    return _json(_read_source(reference))
+
+
+@tool
+def carrier_performance(days: Annotated[int, "look-back window in days"] = 30) -> str:
+    """On-time departure rate of every carrier, using the official definition in
+    SOP-OUT-002 (on time = departed <= 60 min after plan). Use this for any carrier
+    reliability question instead of computing it with SQL."""
+    return _json(_carrier_performance(days))
+
+
+@tool
 def propose_action(
     action_type: Annotated[Literal["email", "ticket"], "email to a partner, or an internal ticket"],
     recipient: Annotated[str, "who receives it, e.g. 'Cardinal Carriers dispatch'"],
@@ -103,5 +122,5 @@ def propose_action(
     return _json({"status": "sent", "simulated": True, "outbox": str(OUTBOX_PATH.name)})
 
 
-TOOLS = [sql_query, check_shipment_compliance, assess_departure_risk, lookup_hazmat,
-         search_documents, propose_action]
+TOOLS = [sql_query, check_shipment_compliance, assess_departure_risk, carrier_performance,
+         lookup_hazmat, search_documents, read_source, propose_action]

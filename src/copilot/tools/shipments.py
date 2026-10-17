@@ -73,8 +73,9 @@ def check_shipment_compliance(shipment_id: str, db_path: Path = DC_DB_PATH) -> d
     return {"shipment": shp, "lines": lines, **result}
 
 
-def carrier_on_time_rate(con, carrier_id: str, now: datetime) -> tuple[float | None, int]:
-    since = (now - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d %H:%M")
+def carrier_on_time_rate(con, carrier_id: str, now: datetime,
+                         days: int = LOOKBACK_DAYS) -> tuple[float | None, int]:
+    since = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M")
     rows = con.execute(
         """SELECT planned_departure, actual_departure FROM shipments
            WHERE carrier_id = ? AND status = 'departed' AND planned_departure >= ?""",
@@ -131,3 +132,28 @@ def assess_departure_risk(shipment_id: str, db_path: Path = DC_DB_PATH, now: str
         ] if reasons else [],
         "citation": "SOP-OUT-002 §3-4",
     }
+
+
+@traceable(run_type="tool", name="carrier_performance")
+def carrier_performance(days: int = LOOKBACK_DAYS, db_path: Path = DC_DB_PATH,
+                        now: str = SIM_NOW) -> dict:
+    """On-time departure rate per carrier, using the SOP-OUT-002 §2 definition
+    (on time = departed no more than 60 minutes after the planned time)."""
+    current = datetime.strptime(now, "%Y-%m-%d %H:%M")
+    con = connect(db_path)
+    try:
+        carriers = con.execute(
+            "SELECT carrier_id, name, hazmat_endorsed FROM carriers ORDER BY carrier_id").fetchall()
+        rows = []
+        for cid, name, endorsed in carriers:
+            rate, n = carrier_on_time_rate(con, cid, current, days)
+            rows.append({"carrier_id": cid, "name": name, "hazmat_endorsed": bool(endorsed),
+                         "departures": n,
+                         "on_time_rate": None if rate is None else round(rate, 3),
+                         "below_threshold": rate is not None and rate < ON_TIME_THRESHOLD})
+    finally:
+        con.close()
+    rows.sort(key=lambda r: (r["on_time_rate"] is None, r["on_time_rate"]))
+    return {"window_days": days, "threshold": ON_TIME_THRESHOLD, "carriers": rows,
+            "definition": "on time = actual departure <= planned + 60 min",
+            "citation": "SOP-OUT-002 §2-3"}

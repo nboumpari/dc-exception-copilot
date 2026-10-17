@@ -116,7 +116,7 @@ routing questions to the right collection with metadata filters. Full report:
 
 ## The agent
 
-A LangGraph tool-calling loop around `gpt-5.4-mini` (configurable via `CHAT_MODEL`):
+A LangGraph tool-calling loop around `gpt-5.4-mini` with medium reasoning effort (both configurable via `CHAT_MODEL` / `REASONING_EFFORT`; medium was chosen by measurement):
 
 ```mermaid
 graph LR
@@ -167,20 +167,29 @@ the 6 disagreements, a manual check of the sources sided with Gemini 5 times (1 
 the OpenAI judge penalised omissions the question had not asked about
 ([data/eval/results/judge_comparison.md](data/eval/results/judge_comparison.md)).
 
-LLM answers vary, so each case runs 3 times:
+LLM answers vary, so each case runs 3 times (current suite: 44 cases, 132 answers):
 
-| | Baseline | After agent fixes (OpenAI judge) | Same answers, Gemini judge |
+| | Pass rate (all checks) | Judge: correct | Citations valid |
 |---|---|---|---|
-| Pass rate (all checks) | 64% (1 run) | 87% (86 / 86 / 89%) | **93%** (94 / 89 / 94%) |
-| Judge: correct | 83% | 99% | 100% |
-| Citations valid | 100% | 99% | 99% |
+| Baseline (36 cases, 1 run, OpenAI judge) | 64% | 83% | 100% |
+| After agent fixes (36 cases, OpenAI judge) | 87% (86 / 86 / 89%) | 99% | 99% |
+| Same answers re-graded by Gemini | 93% | 100% | 99% |
+| + data-question work, reasoning `low` (44 cases) | 92% (93 / 91 / 91%) | 98% | 99% |
+| **+ reasoning `medium` (44 cases, current)** | **97%** (95 / 95 / 100%) | 99% | 100% |
 
-The step from 64% to 87% mixes agent improvements (a `read_source` tool to read a found
-source in full, a `carrier_performance` tool so KPIs use the official definition, prompt
-rules for reporting all findings, SQL name matching and escalation) with golden-set
-corrections where checking the sources proved the agent right ("label review" in the file).
-The step from 87% to 93% is the judge alone - same answers. Weakest area: data questions
-(83%; one SQL name-matching case is flaky). Report: [data/eval/results/agent.md](data/eval/results/agent.md).
+What moved the numbers, each measured in isolation where possible
+([experiment log](data/eval/results/experiments.md)):
+- **Agent capabilities:** `read_source` (read a found source in full before saying "not
+  found"), `carrier_performance` and `assess_inbound_receipt` (business rules in code, not in
+  LLM-written SQL), exact category values in the schema (the model had invented a category
+  name), and an SQL hint when an exact name match finds nothing.
+- **Reasoning effort `medium`:** 92% -> 97% for 12% more tokens and 1.6 s per answer.
+- **Measurement fixes, not agent changes:** golden-set references corrected where the sources
+  proved the agent right ("label review" in the file), and the judge switch (87% -> 93% on
+  identical answers).
+
+Remaining weak spots are listed in the experiment log. Report:
+[data/eval/results/agent.md](data/eval/results/agent.md).
 
 ```bash
 uv run python -m copilot.eval.agent_eval --repeats 3   # local report
@@ -199,6 +208,7 @@ deterministic, tested code - the LLM chooses a tool and explains the result.
 | `lookup_hazmat` | 49 CFR 172.101 Hazardous Materials Table (3,000+ entries) parsed from the regulation into `data/reference.db` |
 | `check_shipment_compliance` | 177.848 segregation using the table parsed from the regulation, the limited-quantity exception, the DC's calcium hypochlorite / TCCA rule, and carrier hazmat endorsement |
 | `assess_departure_risk` | The at-risk rules of SOP-OUT-002 §3 (trailer assignment, carrier on-time rate, endorsement) |
+| `assess_inbound_receipt` | Receipt lines, the supplier's 30-day exception history, enhanced-inspection status (SOP-REC-002 §6) and a receiving checklist |
 | `search_documents`, `read_source` | Retrieval with collection filters (vector by default, hybrid for identifiers); read a found source in full |
 | `carrier_performance` | On-time rate per carrier using the SOP-OUT-002 definition |
 

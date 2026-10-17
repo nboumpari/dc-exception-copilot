@@ -122,6 +122,73 @@
     exceptions in the last 30 days) and is on the enhanced inspection list, so every pallet's
     SSCC should be checked and exceptions handled per SOP-REC-002.
 
+- id: B05
+  category: data
+  question: How many pallets of air freshener do we have available right now?
+  required_tools: [sql_query]
+  must_mention: [["63"]]
+  reference: 63 pallets (4,848 cases) of Fresha air freshener aerosol are in status available.
+
+- id: B06
+  category: data
+  question: Which customer has the most shipments still planned?
+  required_tools: [sql_query]
+  must_mention: [["aquapool"]]
+  reference: AquaPool Supply, with 15 planned shipments (next is HomeBase Stores with 6).
+
+- id: B07
+  category: data
+  question: What was the most common type of exception over the last 30 days?
+  required_tools: [sql_query]
+  must_mention: [["missing_sscc", "missing sscc"]]
+  # label review: "last 30 days" counted from 2026-09-16 18:00 gives 39, from midnight 43 - both valid
+  reference: >-
+    MISSING_SSCC: 39 exceptions counting from 2026-09-16 18:00, or 43 counting whole days from
+    2026-09-16 - either count is correct. Next most common is LATE_CARRIER.
+
+- id: B08
+  category: data
+  question: How many ValueMart shipments have departed since 10 October?
+  required_tools: [sql_query]
+  must_mention: [["17"]]
+  reference: 17 shipments to ValueMart Regional DC have departed since 2026-10-10.
+
+- id: B09
+  category: data
+  question: Which products currently have pallets in quarantine?
+  required_tools: [sql_query]
+  must_mention: [["BLCC-001", "concentrated bleach"]]
+  reference: >-
+    Only BLCC-001 (CleanPro Concentrated Bleach 12.5%), one pallet - linked to the open leak
+    exception EXC-00367.
+
+- id: B10
+  category: data
+  question: Which supplier had the most label exceptions (missing or unreadable SSCC) in the last 30 days?
+  required_tools: [sql_query]
+  must_mention: [["delta copack"]]
+  # label review: 22 from 2026-09-16 18:00, 26 counting whole days - both valid
+  reference: >-
+    Delta Copack Services, with 22 label exceptions counting from 2026-09-16 18:00 (26 counting
+    whole days from 2026-09-16), well ahead of Northgate Aerosol Fillers (about 12).
+
+- id: B11
+  category: data
+  question: List the open exceptions in zone H4.
+  required_tools: [sql_query]
+  must_mention: [["EXC-00367"]]
+  reference: One - EXC-00367, a high-severity leak of concentrated bleach (BLCC-001).
+
+- id: B12
+  category: data
+  question: Is anything arriving from Northgate Aerosol Fillers tomorrow?
+  required_tools: [sql_query]
+  # label review: mentioning tomorrow's other receipt (RCV-00408, Delta) is correct context
+  must_mention: [["no ", "none", "nothing", "not scheduled", "isn't", "is not", "aren't", "are not"]]
+  reference: >-
+    No - there is no receipt from Northgate Aerosol Fillers expected on 2026-10-17 (or later
+    in the planned window). Tomorrow's only inbound is RCV-00408 from Delta Copack.
+
 # ---------------- our procedures (SOPs) ----------------
 - id: P01
   category: procedure

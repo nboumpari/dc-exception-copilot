@@ -342,6 +342,7 @@ def main() -> None:
     parser.add_argument("--no-judge", action="store_true", help="skip the LLM judge")
     parser.add_argument("--langsmith", action="store_true", help="run as a LangSmith experiment")
     parser.add_argument("--repeats", type=int, default=1, help="runs per case (answers vary)")
+    parser.add_argument("--out", default="agent", help="results file name (default: agent)")
     parser.add_argument("--rejudge", action="store_true",
                         help="re-grade the saved answers in results/agent.json with the current "
                              "judge (no agent runs) and compare with the previous judge")
@@ -366,10 +367,10 @@ def main() -> None:
         return
     rows = evaluate_local(cases, not args.no_judge, args.repeats)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (RESULTS_DIR / "agent.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False),
-                                            encoding="utf-8")
+    (RESULTS_DIR / f"{args.out}.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False),
+                                                 encoding="utf-8")
     md = report(rows)
-    (RESULTS_DIR / "agent.md").write_text(md, encoding="utf-8")
+    (RESULTS_DIR / f"{args.out}.md").write_text(md, encoding="utf-8")
     print(md)
 
 

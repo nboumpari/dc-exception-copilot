@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: str = ""
     chat_model: str = "gpt-5.4-mini"  # agent LLM; any tool-calling OpenAI model works
-    reasoning_effort: str = "low"  # none | low | medium | high
+    reasoning_effort: str = "medium"  # none | low | medium | high - medium measured best (eval)
     # evaluation judge: a different provider than the agent (avoids self-preference bias)
     judge_provider: str = "google"  # google | openai
     judge_model: str = ""  # empty = provider default (see eval/agent_eval.py)

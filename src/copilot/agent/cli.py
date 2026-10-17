@@ -56,6 +56,9 @@ def main() -> None:
     parser.add_argument("-q", "--quiet", action="store_true", help="hide tool calls")
     args = parser.parse_args()
     verbose = not args.quiet
+    # Windows consoles default to a legacy code page that cannot print "§" or "—"
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
 
     cp = Copilot()
     if args.question:

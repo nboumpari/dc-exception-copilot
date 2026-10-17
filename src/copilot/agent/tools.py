@@ -14,6 +14,7 @@ from langgraph.types import interrupt
 
 from copilot.config import DATA_DIR
 from copilot.tools.hazmat import lookup_hazmat as _lookup_hazmat
+from copilot.tools.receipts import assess_inbound_receipt as _assess_inbound_receipt
 from copilot.tools.search import read_source as _read_source
 from copilot.tools.search import search_documents as _search_documents
 from copilot.tools.shipments import assess_departure_risk as _assess_departure_risk
@@ -89,6 +90,14 @@ def read_source(reference: Annotated[str, "a citation or document id from a sear
 
 
 @tool
+def assess_inbound_receipt(receipt_id: Annotated[str, "e.g. RCV-00408 (find it with sql_query)"]) -> str:
+    """Briefing for an inbound receipt: lines and hazmat, the supplier's label/exception
+    history over 30 days, enhanced-inspection status and a receiving checklist with SOP
+    citations. Use it for any 'what should receiving watch out for' question."""
+    return _json(_assess_inbound_receipt(receipt_id))
+
+
+@tool
 def carrier_performance(days: Annotated[int, "look-back window in days"] = 30) -> str:
     """On-time departure rate of every carrier, using the official definition in
     SOP-OUT-002 (on time = departed <= 60 min after plan). Use this for any carrier
@@ -122,5 +131,5 @@ def propose_action(
     return _json({"status": "sent", "simulated": True, "outbox": str(OUTBOX_PATH.name)})
 
 
-TOOLS = [sql_query, check_shipment_compliance, assess_departure_risk, carrier_performance,
-         lookup_hazmat, search_documents, read_source, propose_action]
+TOOLS = [sql_query, check_shipment_compliance, assess_departure_risk, assess_inbound_receipt,
+         carrier_performance, lookup_hazmat, search_documents, read_source, propose_action]

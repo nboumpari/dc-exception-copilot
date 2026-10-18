@@ -1,0 +1,12 @@
+# Streamlit settings for this project (read automatically when run from the project folder)
+
+[server]
+# do not stop at the first-run "Email:" question; the start script prints the URL instead
+headless = true
+port = 8501
+# only reachable from this computer, not from other devices on the network
+address = "localhost"
+
+[browser]
+# no usage statistics sent to Streamlit
+gatherUsageStats = false

@@ -152,8 +152,14 @@ The agent runs as a **FastAPI** service; the **Streamlit** app is a client of th
 never calls the agent directly), so any other system could use the same endpoints.
 
 ```bash
-uv run uvicorn copilot.api.app:app --port 8000                       # terminal 1: API
-uv run --group ui streamlit run src/copilot/ui/streamlit_app.py      # terminal 2: UI
+./run.sh          # starts the API and the Streamlit UI together; Ctrl+C stops both
+```
+
+Or separately, in two terminals:
+
+```bash
+uv run uvicorn copilot.api.app:app --port 8000
+uv run --group ui streamlit run src/copilot/ui/streamlit_app.py
 ```
 
 - **Streamlit** (http://localhost:8501): a **Chat** tab (example questions, cited answers,

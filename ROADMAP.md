@@ -13,7 +13,7 @@ Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 | 5 | **Tools** | Read-only SQL, Hazardous Materials Table lookup, 177.848 segregation + shipment compliance, departure risk, document search; tested on the planted scenarios | done |
 | 6 | **Agent (LangGraph)** | Single tool-calling agent (simpler and easier to evaluate than several sub-agents); cited answers with citation verification; human approval for actions; CLI | done |
 | 7 | **Agent evaluation** (moved before the API) | 44-case golden set, code checks + cross-provider LLM judge (Gemini grading an OpenAI agent, validated against a second judge), 3 runs per case, LangSmith experiments; 64% -> 97% with documented experiments | done |
-| 8 | **API + UI** | FastAPI `/ask` endpoint; simple chat UI with sources and approvals | |
+| 8 | **API + UI** | FastAPI service (ask, approvals, health, typed docs), explicit 503/409/401 errors, chat page with citations and approvals; API tests with a fake model | done |
 | 9 | **Guardrails + logging** | Prompt-injection tests, refusal when unsure, structured logs of every tool call | |
 | 10 | **CI + polish** | GitHub Actions (lint, tests, eval on small set); README diagram; demo video | |
 

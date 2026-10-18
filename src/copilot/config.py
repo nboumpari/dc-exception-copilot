@@ -48,6 +48,9 @@ class Settings(BaseSettings):
 
     corpus_contact: str = "anonymous"
 
+    # API: if set, requests must send it in the X-API-Key header
+    api_key: str = ""
+
     # LangSmith tracing and evaluation (off unless enabled and a key is set)
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""

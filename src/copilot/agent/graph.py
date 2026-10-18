@@ -135,6 +135,13 @@ class Copilot:
         self.graph.invoke({"messages": [HumanMessage(question)]}, self._config(thread_id))
         return self._verified_result(thread_id)
 
+    def thread_status(self, thread_id: str) -> str:
+        """'unknown' (no such conversation), 'awaiting_approval' or 'idle'."""
+        state = self.graph.get_state(self._config(thread_id))
+        if not state.values.get("messages"):
+            return "unknown"
+        return "awaiting_approval" if state.interrupts else "idle"
+
     @traceable(name="copilot.resume", run_type="chain")
     def resume(self, thread_id: str, approved: bool, comment: str = "",
                edited_body: str | None = None, approver: str = "user") -> AgentResult:

@@ -146,6 +146,35 @@ uv run python -m copilot.agent.cli                       # interactive chat
 uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
 ```
 
+## API and chat UI
+
+The agent runs as a FastAPI service; the chat page is just another client of the API.
+
+```bash
+uv run uvicorn copilot.api.app:app --port 8000
+```
+
+Open http://localhost:8000 for the chat (example questions, cited answers, approve / edit /
+reject proposed emails) or http://localhost:8000/docs for interactive API docs.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness and configuration (no secrets) |
+| `POST /ask` | `{"question": ..., "thread_id": optional}` -> answer, citations, tools used, pending action |
+| `GET /threads/{id}` | Is the conversation waiting for an approval? |
+| `POST /threads/{id}/approve` | `{"approved": true/false, "edited_body": optional}` -> the agent's follow-up |
+
+```bash
+curl -X POST localhost:8000/ask -H "Content-Type: application/json"      -d '{"question": "Is SHP-01209 OK to load tomorrow?"}'
+```
+
+- **Errors are explicit:** a provider outage or exhausted API credits returns `503` with a
+  readable message; other failures return a JSON `500` without internals (details in the
+  server log). Asking in a thread that awaits an approval, or approving twice, returns `409`.
+- **Optional API key:** set `API_KEY` in `.env` and clients must send `X-API-Key`.
+- **Safe rendering:** answers can quote documents, so the page sanitizes them (DOMPurify).
+- Conversations are kept in memory and reset when the server restarts.
+
 ## Agent evaluation
 
 36 end-to-end test cases ([data/eval/agent_golden.yaml](data/eval/agent_golden.yaml)): the

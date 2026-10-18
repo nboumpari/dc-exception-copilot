@@ -3,11 +3,8 @@
 import json
 
 import pytest
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
-from pydantic import Field
 
 from copilot.agent import tools as agent_tools
 from copilot.agent.graph import (
@@ -17,28 +14,7 @@ from copilot.agent.graph import (
     check_citations,
     foreign_words,
 )
-
-
-class ScriptedModel(BaseChatModel):
-    """Replays prepared AIMessages in order and records what it was sent."""
-
-    script: list
-    seen: list = Field(default_factory=list)
-
-    @property
-    def _llm_type(self) -> str:
-        return "scripted"
-
-    def bind_tools(self, tools, **kwargs):
-        return self
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        self.seen.append(messages)
-        return ChatResult(generations=[ChatGeneration(message=self.script.pop(0))])
-
-
-def call(name: str, args: dict, cid: str = "c1") -> AIMessage:
-    return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": cid}])
+from fakes import ScriptedModel, call
 
 
 @tool

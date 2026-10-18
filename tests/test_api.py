@@ -105,11 +105,10 @@ def test_api_key_is_enforced_when_configured(monkeypatch):
     assert r.status_code == 200
 
 
-def test_chat_page_is_served():
+def test_root_redirects_to_api_docs():
     with client_for([]) as c:
-        r = c.get("/")
-    assert r.status_code == 200 and "DC Exception Copilot" in r.text
-    assert "DOMPurify.sanitize" in r.text  # answers are sanitized before display
+        r = c.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/docs"
 
 
 def test_llm_out_of_credits_returns_clear_503():

@@ -85,7 +85,7 @@ config/            corpus sources and settings
 data/raw/          downloaded corpus (git-ignored)
 data/synthetic/    SOPs (hand-written), SDS + incident reports (generated)
 data/dc.db         synthetic warehouse database (git-ignored, regenerate)
-src/copilot/       package: ingest/, retrieval/, agents/, tools/, api/
+src/copilot/       package: ingest/, retrieval/, tools/, agent/, eval/, api/, ui/
 tests/             unit tests + eval suite
 notebooks/         walkthrough notebook (imports the modules)
 ```
@@ -148,14 +148,18 @@ uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
 
 ## API and chat UI
 
-The agent runs as a FastAPI service; the chat page is just another client of the API.
+The agent runs as a **FastAPI** service; the **Streamlit** app is a client of that API (it
+never calls the agent directly), so any other system could use the same endpoints.
 
 ```bash
-uv run uvicorn copilot.api.app:app --port 8000
+uv run uvicorn copilot.api.app:app --port 8000                       # terminal 1: API
+uv run --group ui streamlit run src/copilot/ui/streamlit_app.py      # terminal 2: UI
 ```
 
-Open http://localhost:8000 for the chat (example questions, cited answers, approve / edit /
-reject proposed emails) or http://localhost:8000/docs for interactive API docs.
+- **Streamlit** (http://localhost:8501): a **Chat** tab (example questions, cited answers,
+  tools used, an approval form to edit / approve / reject proposed emails) and an
+  **Evaluation** tab (pass rate by category, retrieval comparison, flaky cases, experiment log).
+- **API docs** (http://localhost:8000/docs): interactive, generated from the typed models.
 
 | Endpoint | Purpose |
 |---|---|
@@ -171,9 +175,8 @@ curl -X POST localhost:8000/ask -H "Content-Type: application/json"      -d '{"q
 - **Errors are explicit:** a provider outage or exhausted API credits returns `503` with a
   readable message; other failures return a JSON `500` without internals (details in the
   server log). Asking in a thread that awaits an approval, or approving twice, returns `409`.
-- **Optional API key:** set `API_KEY` in `.env` and clients must send `X-API-Key`.
-- **Safe rendering:** answers can quote documents, so the page sanitizes them (DOMPurify).
-- Conversations are kept in memory and reset when the server restarts.
+- **Optional API key:** set `API_KEY` in `.env`; clients send it as `X-API-Key`.
+- Conversations are kept in memory and reset when the API restarts.
 
 ## Agent evaluation
 

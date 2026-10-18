@@ -2,7 +2,8 @@
 
 Run:
     uv run uvicorn copilot.api.app:app --port 8000
-Then open http://localhost:8000 (chat page) or http://localhost:8000/docs (API docs).
+Then open http://localhost:8000/docs (interactive API docs). The chat UI is the separate
+Streamlit app in copilot/ui, which calls this API.
 
 Endpoints:
     GET  /health                       liveness + configuration (no secrets)
@@ -17,19 +18,17 @@ Conversations live in memory: they are lost when the server restarts.
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated
 
 import openai
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from copilot.agent.graph import AgentResult, Copilot
 from copilot.config import settings
 from copilot.synthetic.catalog import SIM_NOW
 
-STATIC_DIR = Path(__file__).parent / "static"
 log = logging.getLogger("copilot.api")
 
 
@@ -165,8 +164,8 @@ def create_app(copilot: Copilot | None = None) -> FastAPI:
                                      edited_body=req.edited_body, approver=req.approver))
 
     @app.get("/", include_in_schema=False)
-    def chat_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")  # the chat UI is the separate Streamlit app
 
     return app
 

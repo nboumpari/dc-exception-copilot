@@ -15,7 +15,7 @@ for port in "$API_PORT" "$UI_PORT"; do
 done
 
 echo "Starting the API on http://localhost:$API_PORT ..."
-uv run uvicorn copilot.api.app:app --port "$API_PORT" &
+uv run python -m uvicorn copilot.api.app:app --port "$API_PORT" &
 API_PID=$!
 trap 'echo; echo "Stopping..."; kill "$API_PID" 2>/dev/null || true' EXIT
 
@@ -30,4 +30,4 @@ echo "  Chat UI:   http://localhost:$UI_PORT"
 echo "  API docs:  http://localhost:$API_PORT/docs"
 echo "  Press Ctrl+C to stop both."
 echo
-uv run --group ui streamlit run src/copilot/ui/streamlit_app.py --server.port "$UI_PORT"
+uv run --group ui python -m streamlit run src/copilot/ui/streamlit_app.py --server.port "$UI_PORT"

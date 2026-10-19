@@ -151,6 +151,11 @@ uv run python -m copilot.agent.cli "Check SHP-01211 before it leaves"
 The agent runs as a **FastAPI** service; the **Streamlit** app is a client of that API (it
 never calls the agent directly), so any other system could use the same endpoints.
 
+**Windows:** double-click `start-copilot.bat` (or a Desktop shortcut to it). It starts the API
+and the UI, opens http://localhost:8501 in your browser, and closing its window stops both.
+
+**Git Bash / macOS / Linux:**
+
 ```bash
 ./run.sh          # starts the API and the Streamlit UI together; Ctrl+C stops both
 ```
@@ -158,9 +163,11 @@ never calls the agent directly), so any other system could use the same endpoint
 Or separately, in two terminals:
 
 ```bash
-uv run uvicorn copilot.api.app:app --port 8000
-uv run --group ui streamlit run src/copilot/ui/streamlit_app.py
+uv run python -m uvicorn copilot.api.app:app --port 8000
+uv run --group ui python -m streamlit run src/copilot/ui/streamlit_app.py
 ```
+
+(`python -m` avoids small launcher `.exe` files, which Windows application control can block.)
 
 - **Streamlit** (http://localhost:8501): a **Chat** tab (example questions, cited answers,
   tools used, an approval form to edit / approve / reject proposed emails) and an

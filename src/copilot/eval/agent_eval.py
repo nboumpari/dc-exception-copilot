@@ -6,6 +6,7 @@ Usage:
     uv run python -m copilot.eval.agent_eval --no-judge       # code checks only (cheaper)
     uv run python -m copilot.eval.agent_eval --repeats 3      # each case 3x: average + flaky cases
     uv run python -m copilot.eval.agent_eval --langsmith      # also log as a LangSmith experiment
+    uv run python -m copilot.eval.agent_eval --set redteam    # adversarial cases (guardrails)
 
 Scoring - everything checkable in code is checked in code:
   tool_selection     every required tool was called
@@ -14,6 +15,7 @@ Scoring - everything checkable in code is checked in code:
   no_forbidden       no must_not_mention phrase appears
   citations_valid    every citation in the answer matches a tool result
   action             an action was proposed for human approval iff one was expected
+  blocked            (red-team) the input guardrail blocked the request iff expected
 An LLM judge from a different provider than the agent (Gemini by default - a judge from the
 agent's own model family tends to favour its answers) grades only what code cannot:
   judge_correct      nothing in the answer contradicts the reference
@@ -37,14 +39,16 @@ from copilot.config import DATA_DIR, settings
 from copilot.observability import setup_tracing
 from copilot.synthetic.catalog import SIM_NOW
 
-CASES_PATH = DATA_DIR / "eval" / "agent_golden.yaml"
+CASE_SETS = {"agent": DATA_DIR / "eval" / "agent_golden.yaml",
+             "redteam": DATA_DIR / "eval" / "redteam.yaml"}
+CASES_PATH = CASE_SETS["agent"]
 RESULTS_DIR = DATA_DIR / "eval" / "results"
 CONCURRENCY = 4
 JUDGE_CONCURRENCY = 3  # keep under free-tier rate limits
 
 
-def load_cases(ids: list[str] | None = None) -> list[dict]:
-    cases = yaml.safe_load(CASES_PATH.read_text(encoding="utf-8"))
+def load_cases(ids: list[str] | None = None, path=CASES_PATH) -> list[dict]:
+    cases = yaml.safe_load(path.read_text(encoding="utf-8"))
     return [c for c in cases if not ids or c["id"] in ids]
 
 
@@ -61,9 +65,12 @@ def run_case(copilot, case: dict) -> dict:
     r = copilot.ask(case["question"])
     proposal = r.pending_action
     calls = list(r.tool_calls)
+    flags = list(r.guardrail_flags)
     if proposal:
-        r = copilot.resume(r.thread_id, approved=False, comment="Not approved (evaluation run).")
+        r = copilot.resume(r.thread_id, approved=False, comment="Not approved (evaluation run).",
+                           approver="evaluator")
         calls += r.tool_calls
+        flags += r.guardrail_flags
     return {
         "answer": r.answer or "",
         "tool_calls": calls,
@@ -72,6 +79,7 @@ def run_case(copilot, case: dict) -> dict:
         "citation_retries": r.citation_retries,
         "proposal": proposal,
         "usage": r.usage,
+        "guardrail_flags": flags,
         "latency_s": round(time.perf_counter() - start, 1),
     }
 
@@ -93,6 +101,9 @@ def code_scores(case: dict, out: dict) -> dict[str, float]:
         s["no_forbidden"] = float(not any(_norm(p) in answer for p in case["must_not_mention"]))
     s["citations_valid"] = float(not out["unverified_citations"])
     s["action"] = float(bool(out["proposal"]) == bool(case.get("expect_action")))
+    if "expect_blocked" in case:
+        blocked = any(f.startswith("blocked:") for f in out.get("guardrail_flags", []))
+        s["blocked"] = float(blocked == case["expect_blocked"])
     return s
 
 
@@ -206,7 +217,7 @@ def evaluate_local(cases: list[dict], use_judge: bool = True, repeats: int = 1) 
         return list(pool.map(one, jobs))
 
 
-def report(rows: list[dict]) -> str:
+def report(rows: list[dict], title: str = "Agent evaluation") -> str:
     def mean(xs): return sum(xs) / len(xs) if xs else 0.0
 
     repeats = max(r["repeat"] for r in rows) + 1
@@ -217,7 +228,7 @@ def report(rows: list[dict]) -> str:
     tokens = [r["usage"].get("input_tokens", 0) + r["usage"].get("output_tokens", 0) for r in rows]
     spread = f" (runs: {', '.join(f'{x:.0%}' for x in per_run)})" if repeats > 1 else ""
     lines = [
-        "# Agent evaluation", "",
+        f"# {title}", "",
         (f"Model `{settings.chat_model}` (reasoning: {settings.reasoning_effort}), judge "
          f"`{judge_name()}`. {len(ids)} cases x {repeats} run(s)."), "",
         (f"**Pass rate: {mean(per_run):.0%}**{spread} - a case passes when every check "
@@ -253,19 +264,20 @@ def report(rows: list[dict]) -> str:
 
 
 # ---------- LangSmith experiment ----------
-def evaluate_langsmith(cases: list[dict], use_judge: bool = True) -> str:
+def evaluate_langsmith(cases: list[dict], use_judge: bool = True, path=CASES_PATH) -> str:
     from langsmith import Client, evaluate
 
     from copilot.agent.graph import Copilot
 
     client = Client(api_key=settings.langsmith_api_key, api_url=settings.langsmith_endpoint)
-    digest = hashlib.sha256(CASES_PATH.read_bytes()).hexdigest()[:8]
-    name = f"dc-agent-golden-{digest}"
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+    name = f"dc-{path.stem.replace('_', '-')}-{digest}"
     if not client.has_dataset(dataset_name=name):
         ds = client.create_dataset(name, description="End-to-end agent questions with references.")
         client.create_examples(dataset_id=ds.id, examples=[
             {"inputs": {"question": c["question"]}, "outputs": c,
-             "metadata": {"case_id": c["id"], "category": c["category"]}} for c in load_cases()])
+             "metadata": {"case_id": c["id"], "category": c["category"]}}
+            for c in load_cases(path=path)])
     wanted = {c["id"] for c in cases}
     examples = [e for e in client.list_examples(dataset_name=name)
                 if e.metadata.get("case_id") in wanted]
@@ -338,16 +350,20 @@ def judge_agreement(rows: list[dict]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--set", choices=sorted(CASE_SETS), default="agent",
+                        help="case set: agent (golden set) or redteam (adversarial)")
     parser.add_argument("--cases", help="comma-separated case ids (default: all)")
     parser.add_argument("--no-judge", action="store_true", help="skip the LLM judge")
     parser.add_argument("--langsmith", action="store_true", help="run as a LangSmith experiment")
     parser.add_argument("--repeats", type=int, default=1, help="runs per case (answers vary)")
-    parser.add_argument("--out", default="agent", help="results file name (default: agent)")
+    parser.add_argument("--out", help="results file name (default: the case set's name)")
     parser.add_argument("--rejudge", action="store_true",
                         help="re-grade the saved answers in results/agent.json with the current "
                              "judge (no agent runs) and compare with the previous judge")
     args = parser.parse_args()
-    cases = load_cases(args.cases.split(",") if args.cases else None)
+    path = CASE_SETS[args.set]
+    out_name = args.out or args.set
+    cases = load_cases(args.cases.split(",") if args.cases else None, path)
     setup_tracing(project=f"{settings.langsmith_project}-eval")
 
     if args.rejudge:
@@ -363,14 +379,14 @@ def main() -> None:
         return
 
     if args.langsmith:
-        print("LangSmith experiment:", evaluate_langsmith(cases, not args.no_judge))
+        print("LangSmith experiment:", evaluate_langsmith(cases, not args.no_judge, path))
         return
     rows = evaluate_local(cases, not args.no_judge, args.repeats)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (RESULTS_DIR / f"{args.out}.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False),
+    (RESULTS_DIR / f"{out_name}.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False),
                                                  encoding="utf-8")
-    md = report(rows)
-    (RESULTS_DIR / f"{args.out}.md").write_text(md, encoding="utf-8")
+    md = report(rows, "Red-team evaluation" if args.set == "redteam" else "Agent evaluation")
+    (RESULTS_DIR / f"{out_name}.md").write_text(md, encoding="utf-8")
     print(md)
 
 

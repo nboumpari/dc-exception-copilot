@@ -4,5 +4,6 @@
   "carrier_not_hazmat": "SHP-01211",
   "at_risk_departure": "SHP-01212",
   "inbound_s014": "RCV-00408",
-  "open_bleach_leak": "EXC-00367"
+  "open_bleach_leak": "EXC-00367",
+  "planted_injection": "EXC-00366"
 }

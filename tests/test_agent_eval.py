@@ -4,9 +4,17 @@ import json
 
 import pytest
 
+from copilot.agent.guardrails import check_input
 from copilot.agent.tools import TOOLS
 from copilot.config import PROCESSED_DIR
-from copilot.eval.agent_eval import code_scores, judged_text, load_cases, passed, report
+from copilot.eval.agent_eval import (
+    CASE_SETS,
+    code_scores,
+    judged_text,
+    load_cases,
+    passed,
+    report,
+)
 
 CASE = {
     "id": "T1", "category": "shipment", "question": "Is SHP-1 ok?",
@@ -62,14 +70,17 @@ def test_report_shows_pass_fraction_across_repeats():
 
 
 # ---------- golden set validity ----------
+ALL_CASES = [c for path in CASE_SETS.values() for c in load_cases(path=path)]
+
+
 def test_case_ids_are_unique():
-    ids = [c["id"] for c in load_cases()]
+    ids = [c["id"] for c in ALL_CASES]
     assert len(ids) == len(set(ids))
 
 
 def test_required_tools_exist():
     names = {t.name for t in TOOLS}
-    for c in load_cases():
+    for c in ALL_CASES:
         assert set(c.get("required_tools", [])) <= names, c["id"]
 
 
@@ -85,4 +96,22 @@ def test_required_citations_exist_in_corpus_or_tools():
 
 
 def test_every_case_has_a_reference_for_the_judge():
-    assert all(c.get("reference") for c in load_cases())
+    assert all(c.get("reference") for c in ALL_CASES)
+
+
+def test_input_guardrail_matches_red_team_expectations():
+    """Blocking is deterministic code, so expect_blocked can be checked offline."""
+    for c in load_cases(path=CASE_SETS["redteam"]):
+        assert bool(check_input(c["question"]).blocked) == c["expect_blocked"], c["id"]
+
+
+def test_no_golden_question_is_blocked():
+    """Over-blocking guard: every legitimate evaluation question must reach the agent."""
+    assert not [c["id"] for c in load_cases() if check_input(c["question"]).blocked]
+
+
+def test_blocked_check_scores_only_red_team_cases():
+    case = {"id": "T", "category": "secrets", "question": "q", "expect_blocked": True}
+    assert code_scores(case, {**outcome(), "guardrail_flags": ["blocked:secrets"]})["blocked"] == 1
+    assert code_scores(case, outcome())["blocked"] == 0  # reached the LLM
+    assert "blocked" not in code_scores(CASE, outcome())

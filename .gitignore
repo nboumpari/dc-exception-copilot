@@ -27,3 +27,6 @@ data/outbox/
 
 # Application and audit logs
 logs/
+
+# Reports from the CI evaluation workflow (kept as GitHub artifacts instead)
+data/eval/results/ci_*

@@ -1,0 +1,86 @@
+# Quality gate with the REAL agent: a small evaluation subset (golden set + red team).
+# Run it by hand (Actions tab -> "Agent evaluation" -> Run workflow) - it makes paid LLM
+# calls (a few cents), so it never runs automatically.
+#
+# Needs repository secrets OPENAI_API_KEY (agent) and GOOGLE_API_KEY (Gemini judge):
+# Settings -> Secrets and variables -> Actions -> New repository secret.
+name: Agent evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_pass_rate:
+        description: "Fail below this pass rate (0-1)"
+        type: number
+        default: 0.9
+      repeats:
+        description: "Runs per case"
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      LANGSMITH_TRACING: "false"
+      # inputs go through env vars, never straight into a shell command
+      MIN_PASS_RATE: ${{ inputs.min_pass_rate }}
+      REPEATS: ${{ inputs.repeats }}
+      # cases that passed every run in the latest full evaluation, one or more per category
+      GOLDEN_CASES: A01,A02,A03,A04,B02,B04,P01,R01,D01,U01,S02,X01
+      REDTEAM_CASES: T01,T03,T04,T07
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install dependencies (exactly as locked)
+        run: uv sync --locked
+
+      - name: Cache downloaded corpus
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: corpus-${{ hashFiles('config/corpus_sources.yaml') }}
+
+      # embeddings are cached per text, so an older cache still saves most API calls
+      - name: Cache embeddings and search index
+        uses: actions/cache@v4
+        with:
+          path: data/index
+          key: index-${{ hashFiles('config/corpus_sources.yaml', 'src/copilot/ingest/**', 'data/synthetic/**') }}
+          restore-keys: index-
+
+      - name: Build data
+        run: |
+          uv run python -m copilot.ingest.download
+          uv run python -m copilot.synthetic.build_wms
+          uv run python -m copilot.tools.hazmat
+          uv run python -m copilot.ingest.build_chunks
+
+      - name: Golden set subset
+        run: >-
+          uv run python -m copilot.eval.agent_eval --cases "$GOLDEN_CASES" --out ci_golden
+          --repeats "$REPEATS" --min-pass-rate "$MIN_PASS_RATE"
+
+      - name: Red-team subset
+        if: ${{ !cancelled() }}
+        run: >-
+          uv run python -m copilot.eval.agent_eval --set redteam --cases "$REDTEAM_CASES"
+          --out ci_redteam --repeats "$REPEATS" --min-pass-rate "$MIN_PASS_RATE"
+
+      - name: Keep the reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-reports
+          path: data/eval/results/ci_*

@@ -7,6 +7,7 @@ Usage:
     uv run python -m copilot.eval.agent_eval --repeats 3      # each case 3x: average + flaky cases
     uv run python -m copilot.eval.agent_eval --langsmith      # also log as a LangSmith experiment
     uv run python -m copilot.eval.agent_eval --set redteam    # adversarial cases (guardrails)
+    uv run python -m copilot.eval.agent_eval --min-pass-rate 0.9  # exit 1 below 90% (CI gate)
 
 Scoring - everything checkable in code is checked in code:
   tool_selection     every required tool was called
@@ -28,6 +29,7 @@ Proposed actions are always REJECTED by the evaluator - nothing is ever sent.
 import argparse
 import hashlib
 import json
+import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -357,6 +359,8 @@ def main() -> None:
     parser.add_argument("--langsmith", action="store_true", help="run as a LangSmith experiment")
     parser.add_argument("--repeats", type=int, default=1, help="runs per case (answers vary)")
     parser.add_argument("--out", help="results file name (default: the case set's name)")
+    parser.add_argument("--min-pass-rate", type=float,
+                        help="quality gate: exit with an error if the pass rate is lower (0-1)")
     parser.add_argument("--rejudge", action="store_true",
                         help="re-grade the saved answers in results/agent.json with the current "
                              "judge (no agent runs) and compare with the previous judge")
@@ -388,6 +392,12 @@ def main() -> None:
     md = report(rows, "Red-team evaluation" if args.set == "redteam" else "Agent evaluation")
     (RESULTS_DIR / f"{out_name}.md").write_text(md, encoding="utf-8")
     print(md)
+    if summary := os.environ.get("GITHUB_STEP_SUMMARY"):  # shown on the GitHub Actions run page
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write(md.split("## Cases")[0] + "\n")
+    rate = sum(r["passed"] for r in rows) / len(rows)
+    if args.min_pass_rate is not None and rate < args.min_pass_rate:
+        raise SystemExit(f"Quality gate failed: pass rate {rate:.0%} < {args.min_pass_rate:.0%}")
 
 
 if __name__ == "__main__":

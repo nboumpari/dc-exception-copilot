@@ -27,7 +27,6 @@ safety/handling questions — grounded in real regulations and the DC's own data
 | Tests run by CI on every push | **150**, no API keys needed |
 
 How each number was measured, and what moved it: [experiment log](data/eval/results/experiments.md).
-Recording a demo: [docs/demo-script.md](docs/demo-script.md).
 
 ## Architecture
 
@@ -115,7 +114,6 @@ src/copilot/       package: ingest/, retrieval/, tools/, agent/, eval/, api/, ui
 logs/              app.jsonl + audit.jsonl (git-ignored, created at runtime)
 tests/             unit tests + eval suite
 notebooks/         walkthrough notebook (imports the modules)
-docs/              demo recording script
 .github/workflows/ CI (every push) and the manual evaluation gate
 ```
 

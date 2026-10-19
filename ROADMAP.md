@@ -14,7 +14,7 @@ Each step also adds a section to [notebooks/demo.ipynb](notebooks/demo.ipynb).
 | 6 | **Agent (LangGraph)** | Single tool-calling agent (simpler and easier to evaluate than several sub-agents); cited answers with citation verification; human approval for actions; CLI | done |
 | 7 | **Agent evaluation** (moved before the API) | 44-case golden set, code checks + cross-provider LLM judge (Gemini grading an OpenAI agent, validated against a second judge), 3 runs per case, LangSmith experiments; 64% -> 97% with documented experiments | done |
 | 8 | **API + UI** | FastAPI service (ask, approvals, health, typed docs), explicit 503/409/401 errors, Streamlit UI (chat with approvals + evaluation dashboard) as an API client; API and UI tests with a fake model | done |
-| 9 | **Guardrails + logging** | Prompt-injection tests, refusal when unsure, structured logs of every tool call | |
+| 9 | **Guardrails + logging** | Code guardrails (blocked secret/prompt requests, injection flags incl. in data, personal-email block, output rewrite checks, key redaction, keyword-search fallback); 12-case red-team set 64% -> 92%; JSON app log (requests, answers, tool calls, linked to LangSmith run ids) + approval audit log | done |
 | 10 | **CI + polish** | GitHub Actions (lint, tests, eval on small set); README diagram; demo video | |
 
 Optional stretch: add UNECE ADR 2025 (manual download) for a European variant; swap to Azure OpenAI + Azure AI Search (config switch), Dockerfile.

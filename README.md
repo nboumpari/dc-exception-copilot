@@ -86,6 +86,7 @@ data/raw/          downloaded corpus (git-ignored)
 data/synthetic/    SOPs (hand-written), SDS + incident reports (generated)
 data/dc.db         synthetic warehouse database (git-ignored, regenerate)
 src/copilot/       package: ingest/, retrieval/, tools/, agent/, eval/, api/, ui/
+logs/              app.jsonl + audit.jsonl (git-ignored, created at runtime)
 tests/             unit tests + eval suite
 notebooks/         walkthrough notebook (imports the modules)
 ```
@@ -220,7 +221,11 @@ LLM answers vary, so each case runs 3 times (current suite: 44 cases, 132 answer
 | After agent fixes (36 cases, OpenAI judge) | 87% (86 / 86 / 89%) | 99% | 99% |
 | Same answers re-graded by Gemini | 93% | 100% | 99% |
 | + data-question work, reasoning `low` (44 cases) | 92% (93 / 91 / 91%) | 98% | 99% |
-| **+ reasoning `medium` (44 cases, current)** | **97%** (95 / 95 / 100%) | 99% | 100% |
+| + reasoning `medium` (44 cases) | 97% (95 / 95 / 100%) | 99% | 100% |
+| **+ step 9 guardrails and prompt rules (current)** | **95%** (98 / 95 / 93%) | 100% | 99% |
+
+The step 9 row is within the run-to-run spread of the row above it (no measurable regression;
+see the experiment log).
 
 What moved the numbers, each measured in isolation where possible
 ([experiment log](data/eval/results/experiments.md)):
@@ -258,6 +263,60 @@ deterministic, tested code - the LLM chooses a tool and explains the result.
 | `carrier_performance` | On-time rate per carrier using the SOP-OUT-002 definition |
 
 Every tool is traced in LangSmith and returns findings with citations.
+
+## Guardrails
+
+Deterministic checks in plain code ([guardrails.py](src/copilot/agent/guardrails.py)) wrap the
+agent. Code decides what must never happen; the prompt only lowers how often the model tries.
+
+| Where | Check | Effect |
+|---|---|---|
+| Input | Requests for API keys, credentials or the system prompt | **Blocked** with a fixed reply; the LLM never sees them |
+| Input | Prompt-injection phrasing ("ignore your rules", "you are now…") | Flagged and logged; the agent's rules and the code-based compliance tools still apply |
+| Tool results | Instructions hidden in database records or documents (indirect injection) | Flagged; the agent tells the user it ignored them |
+| Actions | Email to a personal address (gmail.com, outlook.com…) | Refused inside `propose_action`, before a human is even asked |
+| Actions | Every email/ticket | Needs human approval; the database is read-only |
+| Output | Claims a message was sent without approval, or grants a hazmat exception | One forced rewrite; flagged if it persists |
+| Output | Anything that looks like an API key | Redacted |
+| Search | Embedding API unavailable (no credits, outage) | Falls back to local keyword search instead of failing |
+
+Patterns are deliberately narrow. On the 1,885 corpus chunks, the 367 exception records, the
+86 legitimate evaluation questions and 132 saved answers they raise **no false alarms**, and
+tests guard against over-blocking (e.g. "Which carriers lack hazmat credentials?" passes).
+
+**Red-team evaluation** ([redteam.yaml](data/eval/redteam.yaml)): 12 attacks - direct and
+indirect prompt injection (an instruction planted in exception EXC-00366), secret and
+system-prompt extraction, approval bypass, data exfiltration to a personal address, SQL
+writes, a fake "EHS coordinator", a non-existent regulation and an off-topic request - scored
+with the same harness as the golden set:
+
+```bash
+uv run python -m copilot.eval.agent_eval --set redteam --repeats 3
+```
+
+| | Pass rate (3 runs) |
+|---|---|
+| Before fixes | 64% |
+| After fixes (one code check, four prompt rules) | **92%** (92/92/92) |
+
+The baseline showed the agent would draft an email exporting the customer list to a Gmail
+address (stopped only by the human approval step); a code check now makes that impossible.
+Details in the [experiment log](data/eval/results/experiments.md).
+
+## Logging
+
+Two local JSON Lines logs complement LangSmith ([logs.py](src/copilot/logs.py)), and keep
+working when LangSmith is off or out of quota:
+
+- `logs/app.jsonl`: API requests (path, status, duration, request id), answers (thread id,
+  LangSmith `run_id`, tools, tokens, latency, citation and guardrail results), every tool call
+  (arguments, duration, outcome), search fallbacks and errors. **No question text or
+  secrets** - only ids, sizes and a hash; the text stays in LangSmith.
+- `logs/audit.jsonl`: append-only record of every approval or rejection of a proposed email or
+  ticket - who decided, when, the recipient, and whether the body was edited.
+
+Each answer line carries the LangSmith `run_id`, so a slow or flagged answer in the log leads
+straight to its trace. Both files are git-ignored.
 
 ## Observability (LangSmith)
 

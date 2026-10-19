@@ -1,5 +1,7 @@
 # DC Exception Copilot
 
+[![CI](https://github.com/nboumpari/dc-exception-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/nboumpari/dc-exception-copilot/actions/workflows/ci.yml)
+
 An agentic RAG assistant that helps distribution-center (DC) staff resolve warehouse
 exceptions: hazmat loading questions, pallet-label problems, shipments at risk, and
 safety/handling questions — grounded in real regulations and the DC's own data.
@@ -14,16 +16,40 @@ safety/handling questions — grounded in real regulations and the DC's own data
 - *"Which outbound shipments for tomorrow contain hazmat, and are they marked correctly?"*
 - *"What training does a forklift operator need before driving in the hazmat zone?"*
 
-## Architecture (target)
+## Results at a glance
 
-```
-User (Streamlit UI / FastAPI)
-        │
-   Supervisor agent (LangGraph) ── plans, routes, writes final cited answer
-        ├── Knowledge agent  → hybrid RAG over regulations, GS1 standards, SOPs
-        ├── Ops data agent   → read-only SQL over the DC database (SQLite)
-        ├── Hazmat tool      → deterministic 49 CFR 177.848 segregation check
-        └── Action step      → drafts incident report / email, human approves
+| Measure | Result |
+|---|---|
+| Agent golden set: 44 questions × 3 runs, code checks + Gemini judge | **95%** pass every check |
+| Red-team set: 12 attacks × 3 runs | **92%** (from 64% before guardrail fixes) |
+| Citations that match a tool result | **99%** |
+| Retrieval: right passage in the top 5, 42 questions | **88%** (vector search, structured chunks) |
+| Tests run by CI on every push | **150**, no API keys needed |
+
+How each number was measured, and what moved it: [experiment log](data/eval/results/experiments.md).
+Recording a demo: [docs/demo-script.md](docs/demo-script.md).
+
+## Architecture
+
+One tool-calling agent (simpler to test than several sub-agents). Safety-critical decisions
+are made by deterministic code; the LLM chooses tools and explains their results.
+
+```mermaid
+flowchart LR
+    UI["Streamlit chat UI"] -->|HTTP| API["FastAPI service"]
+    API --> IN{"Input<br/>guardrails"}
+    IN -->|"secrets / prompt requests:<br/>fixed reply"| API
+    IN --> AG["LangGraph agent<br/>(gpt-5.4-mini)"]
+    AG <--> TOOLS["Tools"]
+    TOOLS --> SQL[("DC database<br/>SQLite, read-only")]
+    TOOLS --> HAZ["Hazmat + segregation<br/>checks in code"]
+    TOOLS --> RAG["Hybrid search<br/>BM25 + ChromaDB"]
+    RAG --> DOCS[("Regulations, GS1,<br/>SOPs, SDS, incidents")]
+    TOOLS --> ACT["propose_action"] --> HUMAN{{"Human approval"}}
+    AG --> OUT{"Answer checks:<br/>citations, guardrails"}
+    OUT --> API
+    AG -. traces .-> LS["LangSmith"]
+    API -. events .-> LOGS["logs/app.jsonl<br/>logs/audit.jsonl"]
 ```
 
 ## Corpus
@@ -89,6 +115,8 @@ src/copilot/       package: ingest/, retrieval/, tools/, agent/, eval/, api/, ui
 logs/              app.jsonl + audit.jsonl (git-ignored, created at runtime)
 tests/             unit tests + eval suite
 notebooks/         walkthrough notebook (imports the modules)
+docs/              demo recording script
+.github/workflows/ CI (every push) and the manual evaluation gate
 ```
 
 ## Retrieval
@@ -338,6 +366,25 @@ uv run python -m copilot.eval.langsmith_eval --strategies structured --modes vec
 ```
 
 Tracing is off by default and always off in tests.
+
+## Continuous integration
+
+Two GitHub Actions workflows ([.github/workflows/](.github/workflows/)):
+
+- **CI** - on every push and pull request: lint, download the corpus and rebuild all data from
+  scratch, check that the seeded synthetic DC regenerates byte-for-byte, and run the 150
+  tests. Free and keyless: tests use a scripted fake model, so no LLM is ever called.
+- **Agent evaluation** - started by hand (Actions -> Agent evaluation -> Run workflow), because
+  it calls the real agent and judge (a few cents). It runs 12 golden and 4 red-team cases that
+  passed every run in the full evaluation, and **fails if the pass rate drops below 90%**
+  (adjustable). Reports are attached to the run and summarized on its page. It needs the
+  repository secrets `OPENAI_API_KEY` and `GOOGLE_API_KEY`.
+
+The same gate works locally:
+
+```bash
+uv run python -m copilot.eval.agent_eval --cases A01,B04,S02 --min-pass-rate 0.9
+```
 
 ## Walkthrough notebook
 

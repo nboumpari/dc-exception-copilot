@@ -1,0 +1,57 @@
+# Runs on every push and pull request: lint, rebuild the data from scratch, and run the
+# full test suite. No API keys and no LLM calls - the tests use a scripted fake model.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:  # a newer push to the same branch cancels the older run
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LANGSMITH_TRACING: "false"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install dependencies (exactly as locked)
+        run: uv sync --locked --group dev --group ui
+
+      - name: Lint
+        run: uv run ruff check .
+
+      # The public corpus (~18 MB) is git-ignored; download it once and reuse it until the
+      # source list changes.
+      - name: Cache downloaded corpus
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: corpus-${{ hashFiles('config/corpus_sources.yaml') }}
+
+      - name: Build data
+        run: |
+          uv run python -m copilot.ingest.download
+          uv run python -m copilot.synthetic.build_wms
+          uv run python -m copilot.tools.hazmat
+          uv run python -m copilot.ingest.build_chunks
+          uv run python -m copilot.retrieval.naive_chunks
+
+      # The synthetic DC is seeded: regenerating it must reproduce the committed files exactly.
+      - name: Check the synthetic data is reproducible
+        run: git diff --exit-code -- data/synthetic data/eval/scenarios.json
+
+      - name: Tests
+        run: uv run pytest -q -rs

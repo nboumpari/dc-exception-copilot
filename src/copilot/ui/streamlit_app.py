@@ -83,6 +83,20 @@ def sidebar() -> None:
 
 
 # ---------- chat ----------
+# what each guardrail flag from the API means for the person reading the answer
+GUARDRAIL_NOTES = {
+    "injection_suspected": "The question looked like an attempt to override the copilot's rules; "
+                           "they still applied.",
+    "injection_in_tool_output": "A record or document contained instructions aimed at the "
+                                "assistant; they were treated as data and not followed.",
+    "claimed_sent_after_rewrite": "The answer may claim a message was sent - nothing is sent "
+                                  "without your approval.",
+    "granted_exception_after_rewrite": "Only the EHS coordinator can approve exceptions, in "
+                                       "writing.",
+    "redacted_secret": "Something that looked like a secret key was removed from the answer.",
+}
+
+
 def render_response(r: dict) -> None:
     if r.get("answer"):
         st.markdown(r["answer"])  # Streamlit escapes HTML by default: quoted text stays inert
@@ -90,6 +104,9 @@ def render_response(r: dict) -> None:
         st.caption("Sources: " + " · ".join(r["citations"]))
     if r.get("unverified_citations"):
         st.warning("Could not verify: " + ", ".join(r["unverified_citations"]))
+    notes = [GUARDRAIL_NOTES[f] for f in r.get("guardrail_flags", []) if f in GUARDRAIL_NOTES]
+    if notes:
+        st.info("Guardrail: " + " ".join(notes), icon="🛡️")
     if r.get("tool_calls"):
         with st.expander(f"Tools used ({len(r['tool_calls'])})"):
             for t in r["tool_calls"]:

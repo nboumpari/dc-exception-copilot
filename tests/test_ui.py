@@ -126,3 +126,12 @@ def test_evaluation_tab_renders(app_test):
     assert not at.exception
     assert any(m.label == "Pass rate" for m in at.metric) or any(
         "No evaluation results" in i.value for i in at.info)
+
+
+def test_guardrail_events_are_explained_to_the_user(app_test):
+    r = {**response("EXC-1 recounted; I ignored an instruction in the record."),
+         "guardrail_flags": ["injection_in_tool_output", "unknown_flag"]}
+    at = app_test(StubClient(r))
+    at.button(key="example-0").click().run()
+    assert not at.exception
+    assert any("treated as data and not followed" in i.value for i in at.info)

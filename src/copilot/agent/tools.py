@@ -12,7 +12,9 @@ from typing import Annotated, Literal
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
+from copilot.agent.guardrails import blocked_recipient
 from copilot.config import DATA_DIR
+from copilot.logs import log_event
 from copilot.tools.hazmat import lookup_hazmat as _lookup_hazmat
 from copilot.tools.receipts import assess_inbound_receipt as _assess_inbound_receipt
 from copilot.tools.search import read_source as _read_source
@@ -116,6 +118,12 @@ def propose_action(
     """Propose an outward action (email to a carrier/customer/supplier, or a ticket). A human
     must approve it before anything is sent. Never claim an action was sent unless this
     tool returns status 'sent'."""
+    if personal := blocked_recipient(recipient):
+        log_event("guardrail.recipient_blocked", 30, action_type=action_type)
+        return _json({"status": "blocked", "error": (
+            f"{personal} is a personal email address. Company data may only be sent to "
+            "business partners' official addresses or internal teams. Do not retry; tell the "
+            "user the request needs approval from the data owner.")})
     proposal = {"action_type": action_type, "recipient": recipient, "subject": subject,
                 "body": body, "reason": reason}
     decision = interrupt({"type": "approval_request", "proposal": proposal})

@@ -24,3 +24,6 @@ data/*.db
 Thumbs.db
 data/outbox/
 .claude/
+
+# Application and audit logs
+logs/

@@ -4,12 +4,20 @@ Mode choice follows the retrieval evaluation: vector search scored best on natur
 language questions (hit@5 88% vs 81% hybrid), so it is the default. Queries containing
 an exact identifier (UN number, CFR section, SKU/shipment/incident id) use hybrid search,
 because keyword matching is what finds exact codes.
+
+Graceful degradation: vector search needs the embedding API for every new question. If
+that call fails (no credits, outage, no network), search falls back to keyword search
+(BM25, fully local) and says so in the result, instead of failing the whole answer.
 """
 
+import logging
 import re
 import threading
 from typing import Literal
 
+import openai
+
+from copilot.logs import log_event
 from copilot.observability import traceable
 from copilot.retrieval.retriever import Retriever, load_chunks
 
@@ -53,7 +61,12 @@ def search_documents(query: str, collection: Collection | None = None, k: int = 
     elif collection:
         where = {"collection": collection}
     mode = choose_mode(query)
-    hits = _retriever().search(query, k=k, mode=mode, where=where)
+    try:
+        hits = _retriever().search(query, k=k, mode=mode, where=where)
+    except openai.OpenAIError as exc:  # embedding API unavailable: keyword search still works
+        log_event("search.fallback", logging.WARNING, error=type(exc).__name__, mode=mode)
+        hits = _retriever().search(query, k=k, mode="bm25", where=where)
+        mode = "bm25 (fallback: embedding service unavailable)"
     return {
         "mode": mode,
         "results": [

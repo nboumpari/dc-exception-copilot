@@ -13,6 +13,7 @@ import sys
 import warnings
 
 from copilot.agent.graph import AgentResult, Copilot
+from copilot.logs import setup_logging
 
 warnings.filterwarnings("ignore")
 
@@ -60,6 +61,7 @@ def main() -> None:
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8")
 
+    setup_logging(console=False)  # logs/app.jsonl only; keep the chat readable
     cp = Copilot()
     if args.question:
         r = cp.ask(" ".join(args.question))

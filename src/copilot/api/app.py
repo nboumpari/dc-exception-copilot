@@ -13,10 +13,15 @@ Endpoints:
 
 If API_KEY is set in .env, /ask and the thread endpoints require the X-API-Key header.
 Conversations live in memory: they are lost when the server restarts.
+
+Every request is logged to logs/app.jsonl (method, path, status, duration) with a request id
+that is also returned in the X-Request-ID response header.
 """
 
 import logging
 import secrets
+import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -27,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from copilot.agent.graph import AgentResult, Copilot
 from copilot.config import settings
+from copilot.logs import log_event, setup_logging
 from copilot.synthetic.catalog import SIM_NOW
 
 log = logging.getLogger("copilot.api")
@@ -61,6 +67,9 @@ class AgentResponse(BaseModel):
     tool_calls: list[ToolCall]
     pending_action: ProposedAction | None
     usage: dict
+    guardrail_flags: list[str] = Field(
+        default_factory=list, description="guardrail events in this turn, e.g. 'blocked:secrets'")
+    run_id: str | None = Field(None, description="LangSmith trace id (null when tracing is off)")
 
 
 class ApprovalRequest(BaseModel):
@@ -85,6 +94,8 @@ def to_response(r: AgentResult) -> AgentResponse:
         tool_calls=[ToolCall(**c) for c in r.tool_calls],
         pending_action=ProposedAction(**r.pending_action) if r.pending_action else None,
         usage=r.usage,
+        guardrail_flags=r.guardrail_flags,
+        run_id=r.run_id,
     )
 
 
@@ -106,18 +117,36 @@ def create_app(copilot: Copilot | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        setup_logging()
         app.state.copilot = copilot or Copilot()  # build the agent once, at startup
+        log_event("api.startup", chat_model=settings.chat_model,
+                  reasoning_effort=settings.reasoning_effort, auth_required=bool(settings.api_key))
         yield
+        log_event("api.shutdown")
 
     app = FastAPI(title="DC Exception Copilot", version="0.1.0", lifespan=lifespan,
                   description="Agentic RAG assistant for distribution-center exceptions.")
     protected = [Depends(require_api_key)]
 
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        request_id = uuid.uuid4().hex[:8]
+        start = time.perf_counter()
+        response = await call_next(request)
+        status = response.status_code
+        log_event("api.request", logging.WARNING if status >= 400 else logging.INFO,
+                  request_id=request_id, method=request.method, path=request.url.path,
+                  status=status, duration_ms=round((time.perf_counter() - start) * 1000))
+        response.headers["X-Request-ID"] = request_id
+        return response
+
     @app.exception_handler(openai.APIError)
     async def llm_unavailable(request: Request, exc: openai.APIError) -> JSONResponse:
         """The LLM provider failed (no credits, rate limit, outage): say so clearly with 503
         instead of a 500 stack trace."""
-        log.warning("LLM provider error: %s", exc)
+        log_event("llm.error", logging.WARNING, path=request.url.path,
+                  status_code=getattr(exc, "status_code", None), error=type(exc).__name__,
+                  code=getattr(exc, "code", None))
         if getattr(exc, "status_code", None) == 429:
             detail = ("The language model provider refused the request: rate limit reached "
                       "or no API credits left.")
